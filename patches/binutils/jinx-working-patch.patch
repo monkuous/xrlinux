@@ -1,0 +1,12 @@
+diff -urN --no-dereference binutils-clean/gprofng/libcollector/configure.ac binutils-workdir/gprofng/libcollector/configure.ac
+--- binutils-clean/gprofng/libcollector/configure.ac
++++ binutils-workdir/gprofng/libcollector/configure.ac
+@@ -18,7 +18,7 @@
+ 
+ m4_include([../../bfd/version.m4])
+ AC_INIT([gprofng], [BFD_VERSION])
+-AC_CONFIG_MACRO_DIRS([../../config ../..])
++#AC_CONFIG_MACRO_DIRS([../../config ../..])
+ AC_CONFIG_AUX_DIR(../..)
+ AC_CANONICAL_TARGET
+ AM_INIT_AUTOMAKE

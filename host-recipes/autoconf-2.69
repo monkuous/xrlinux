@@ -1,0 +1,17 @@
+#! /bin/sh
+
+name=autoconf-2.69
+from_source=autoconf-2.69
+revision=1
+
+configure() {
+    "${source_dir}/configure" --prefix="${prefix}"
+}
+
+build() {
+    make -j"${parallelism}"
+}
+
+package() {
+    make -j"${parallelism}" DESTDIR="${dest_dir}" install
+}

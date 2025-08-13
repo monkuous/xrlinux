@@ -1,0 +1,13 @@
+#! /bin/sh
+
+name=automake
+version=1.18
+tarball_url="https://ftpmirror.gnu.org/automake/automake-${version}.tar.xz"
+tarball_blake2b="45456d6d0fdcd1222c79980ede1df16dfbf18fa4d4698289dbef7c9e24ae8877881678974c5defcce0a9f46b72882b4603e457e8142722174ccf0e495f941550"
+hostdeps="autoconf"
+
+prepare() {
+    for name in config.guess config.sub; do
+        cp -p /usr/local/share/autoconf/build-aux/"$name" lib
+    done
+}

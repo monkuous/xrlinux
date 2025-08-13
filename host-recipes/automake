@@ -1,0 +1,18 @@
+#! /bin/sh
+
+name=automake
+from_source=automake
+revision=1
+hostdeps="autoconf"
+
+configure() {
+    "${source_dir}/configure" --prefix="${prefix}"
+}
+
+build() {
+    make -j"${parallelism}"
+}
+
+package() {
+    make -j"${parallelism}" DESTDIR="${dest_dir}" install
+}

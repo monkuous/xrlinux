@@ -1,0 +1,11 @@
+#! /bin/sh
+
+name=binutils
+version=2.44
+tarball_url="https://ftpmirror.gnu.org/binutils/binutils-${version}.tar.xz"
+tarball_blake2b="0eb031ace9fb5a7047b81b5a05b1760f7d332c8ed67f98899f153a45f181b83e661a484551af05c0a9b2adc422da84619103c7b1f3c9fad5327872832b5446aa"
+hostdeps="autoconf-2.69 automake libtool"
+
+prepare() {
+    autotools_regen
+}

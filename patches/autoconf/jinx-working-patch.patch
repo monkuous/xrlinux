@@ -1,0 +1,25 @@
+diff -urN --no-dereference autoconf-clean/build-aux/config.guess autoconf-workdir/build-aux/config.guess
+--- autoconf-clean/build-aux/config.guess
++++ autoconf-workdir/build-aux/config.guess
+@@ -1212,6 +1212,9 @@
+ 	fi
+ 	GUESS=$CPU-pc-linux-$LIBCABI
+ 	;;
++    xr17032:Linux:*:*)
++	GUESS=$UNAME_MACINE-unknown-linux-$LIBC
++	;;
+     xtensa*:Linux:*:*)
+ 	GUESS=$UNAME_MACHINE-unknown-linux-$LIBC
+ 	;;
+diff -urN --no-dereference autoconf-clean/build-aux/config.sub autoconf-workdir/build-aux/config.sub
+--- autoconf-clean/build-aux/config.sub
++++ autoconf-workdir/build-aux/config.sub
+@@ -1258,7 +1258,7 @@
+ 			| wasm32 | wasm64 \
+ 			| we32k \
+ 			| x86 | x86_64 | xc16x | xgate | xps100 \
+-			| xstormy16 | xtensa* \
++			| xstormy16 | xr17032 | xtensa* \
+ 			| ymp \
+ 			| z8k | z80)
+ 				;;

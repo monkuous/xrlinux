@@ -1,0 +1,6 @@
+#! /bin/sh
+
+name=autoconf-2.69
+version=2.69
+tarball_url="https://ftpmirror.gnu.org/autoconf/autoconf-${version}.tar.xz"
+tarball_blake2b="71d33d72a06e9a05fbed0eda73bc9d8a3805c7c90bf082959862f93f3c5f01192114176e84d84ecb58fa99512eafbc0ab21ad1407be18c8c63bb3dc1117c482d"

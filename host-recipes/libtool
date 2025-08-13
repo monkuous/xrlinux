@@ -1,0 +1,20 @@
+#! /bin/sh
+
+name=libtool
+from_source=libtool
+revision=1
+hostdeps="autoconf automake"
+imagedeps="build-essential"
+
+configure() {
+    cp -pr "${source_dir}"/. .
+    ./configure --prefix="${prefix}"
+}
+
+build() {
+    make -j"${parallelism}"
+}
+
+package() {
+    make -j"${parallelism}" DESTDIR="${dest_dir}" install
+}
