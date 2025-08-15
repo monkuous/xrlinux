@@ -1519,7 +1519,7 @@ diff -urN --no-dereference binutils-clean/gas/config/tc-xr17032.c binutils-workd
 +      bits |= (*valP & 0x1f) << 21;
 +      break;
 +    default:
-+      as_fatal (_("internal: bad relocation #%d"), fixP->fx_r_type);
++      as_fatal (_("internal: bad relocation %d"), fixP->fx_r_type);
 +      return;
 +    }
 +
@@ -1899,7 +1899,7 @@ diff -urN --no-dereference binutils-clean/opcodes/disassemble.h binutils-workdir
 diff -urN --no-dereference binutils-clean/opcodes/xr17032-dis.c binutils-workdir/opcodes/xr17032-dis.c
 --- binutils-clean/opcodes/xr17032-dis.c	1970-01-01 01:00:00.000000000 +0100
 +++ binutils-workdir/opcodes/xr17032-dis.c
-@@ -0,0 +1,33 @@
+@@ -0,0 +1,347 @@
 +/* Disassembler code for XR/17032.
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +   Contributed by monkuous
@@ -1927,11 +1927,325 @@ diff -urN --no-dereference binutils-clean/opcodes/xr17032-dis.c binutils-workdir
 +
 +/* Prints the instruction by calling print_arguments after proper matching.  */
 +
-+int
-+print_insn_xr17032 (bfd_vma memaddr ATTRIBUTE_UNUSED,
-+		    struct disassemble_info *info ATTRIBUTE_UNUSED)
++static bool
++xr17032_get_insn_data (unsigned int *out, bfd_vma memaddr, struct disassemble_info *info)
 +{
-+  abort(); // TODO
++  bfd_byte buffer[4];
++
++  int status = info->read_memory_func (memaddr, buffer, 4, info);
++  if (status)
++    return false;
++
++  *out = bfd_getl32 (buffer);
++  return true;
++}
++
++static const inst *
++xr17032_find_opcode (unsigned int bits)
++{
++  for (unsigned int i = 0; i < xr17032_num_opcodes; i++)
++    {
++      const inst *candidate = &xr17032_instruction[i];
++
++      if ((bits & candidate->match_mask) == candidate->opcode_bits)
++	return candidate;
++    }
++
++  return NULL;
++}
++
++static void
++xr17032_print_signed (struct disassemble_info *info, unsigned int data,
++		      int bits, char prefix)
++{
++  unsigned int sign_bit = 1u << (bits - 1);
++
++  if (data & sign_bit)
++    info->fprintf_func (info->stream, "%c-0x%x", prefix,
++			sign_bit - (data & ~sign_bit));
++  else
++    info->fprintf_func (info->stream, "%c0x%x", prefix, data);
++}
++
++static const char *
++xr17032_register_name (reg regr)
++{
++  static const char *const names[32] =
++  {
++    [zero] = "zero",
++    [t0] = "t0",
++    [t1] = "t1",
++    [t2] = "t2",
++    [t3] = "t3",
++    [t4] = "t4",
++    [t5] = "t5",
++    [a0] = "a0",
++    [a1] = "a1",
++    [a2] = "a2",
++    [a3] = "a3",
++    [s0] = "s0",
++    [s1] = "s1",
++    [s2] = "s2",
++    [s3] = "s3",
++    [s4] = "s4",
++    [s5] = "s5",
++    [s6] = "s6",
++    [s7] = "s7",
++    [s8] = "s8",
++    [s9] = "s9",
++    [s10] = "s10",
++    [s11] = "s11",
++    [s12] = "s12",
++    [s13] = "s13",
++    [s14] = "s14",
++    [s15] = "s15",
++    [s16] = "s16",
++    [s17] = "s17",
++    [tp] = "tp",
++    [sp] = "sp",
++    [lr] = "lr",
++  };
++
++  return names[regr];
++}
++
++static const char *
++xr17032_reg_op_name (reg_op op)
++{
++  static const char *const names[4] =
++  {
++    [reg_lsh] = "LSH",
++    [reg_rsh] = "RSH",
++    [reg_ash] = "ASH",
++    [reg_ror] = "ROR",
++  };
++
++  return names[op];
++}
++
++static const char *
++xr17032_control_reg_name (creg cregr)
++{
++  static const char *const names[32] =
++  {
++    [rs] = "rs",
++    [whami] = "whami",
++    [eb] = "eb",
++    [epc] = "epc",
++    [ebadaddr] = "ebadaddr",
++    [tbmissaddr] = "tbmissaddr",
++    [tbpc] = "tbpc",
++    [scratch0] = "scratch0",
++    [scratch1] = "scratch1",
++    [scratch2] = "scratch2",
++    [scratch3] = "scratch3",
++    [scratch4] = "scratch4",
++    [itbpte] = "itbpte",
++    [itbtag] = "itbtag",
++    [itbindex] = "itbindex",
++    [itbctrl] = "itbctrl",
++    [icachectrl] = "icachectrl",
++    [itbaddr] = "itbaddr",
++    [dtbpte] = "dtbpte",
++    [dtbtag] = "dtbtag",
++    [dtbindex] = "dtbindex",
++    [dtbctrl] = "dtbctrl",
++    [dcachectrl] = "dcachectrl",
++    [dtbaddr] = "dtbaddr",
++  };
++
++  const char *name = names[cregr];
++
++  if (!name)
++    name = "(unknown control register)";
++
++  return name;
++}
++
++static const char *const xr17032_mem_size_names[] =
++{
++  "byte",
++  "int",
++  "long",
++};
++
++static void
++xr17032_print_memimm (struct disassemble_info *info, unsigned int bits,
++		      int shift, char prefix, int index)
++{
++  reg regr = (bits >> (6 + index * 5)) & 0x1f;
++  unsigned int offset = ((bits >> 16) & 0xffff) << shift;
++
++  const char *size_name = xr17032_mem_size_names[shift];
++  const char *reg_name = xr17032_register_name (regr);
++
++  info->fprintf_func (info->stream, "%c%s [%s + 0x%x]", prefix, size_name,
++		      reg_name, offset);
++}
++
++static void
++xr17032_print_memreg (struct disassemble_info *info, unsigned int bits,
++		      int shift, char prefix)
++{
++  reg base_reg = (bits >> 11) & 0x1f;
++  reg offs_reg = (bits >> 16) & 0x1f;
++  reg_op op = (bits >> 26) & 3;
++  unsigned int op_val = (bits >> 21) & 0x1f;
++
++  const char *size_name = xr17032_mem_size_names[shift];
++  const char *base_name = xr17032_register_name (base_reg);
++  const char *offs_name = xr17032_register_name (offs_reg);
++  const char *op_name = xr17032_reg_op_name (op);
++
++  info->fprintf_func (info->stream, "%c%s [%s + %s %s %u]", prefix, size_name,
++		      base_name, offs_name, op_name, op_val);
++}
++
++static void
++xr17032_print_operand (struct disassemble_info *info, operand_type type,
++		       unsigned int bits, bfd_vma addr, char prefix, int index)
++{
++  switch (type)
++    {
++    case dummy:
++      break;
++    case imm29:
++    {
++      bfd_vma value = (addr & 0x80000000) | ((bits >> 1) & 0x7ffffffc);
++      info->fprintf_func (info->stream, "%c", prefix);
++      info->print_address_func (value, info);
++      break;
++    }
++    case imm16:
++    {
++      unsigned int value = (bits >> 16) & 0xffff;
++      info->fprintf_func (info->stream, "%c0x%x", prefix, value);
++      break;
++    }
++    case imm16_16:
++    {
++      unsigned int value = bits & 0xffff0000;
++      info->fprintf_func (info->stream, "%c0x%x", prefix, value);
++      break;
++    }
++    case simm16:
++      xr17032_print_signed (info, (bits >> 16) & 0xffff, 16, prefix);
++      break;
++    case simm16_2:
++      xr17032_print_signed (info, (bits >> 14) & 0x3ffc, 18, prefix);
++      break;
++    case simm5:
++      xr17032_print_signed (info, (bits >> 11) & 0x1f, 5, prefix);
++      break;
++    case disp21:
++    {
++      bfd_vma value = (bits >> 9) & 0x7ffffc;
++
++      if (value & 0x400000)
++	value = addr - (0x400000 - (value & 0x3fffff));
++      else
++	value += addr;
++
++      info->fprintf_func (info->stream, "%c", prefix);
++      info->print_address_func (value, info);
++      break;
++    }
++    case regA:
++    {
++      reg regr = (bits >> 6) & 0x1f;
++      const char *name = xr17032_register_name (regr);
++      info->fprintf_func (info->stream, "%c%s", prefix, name);
++      break;
++    }
++    case regB:
++    {
++      reg regr = (bits >> 11) & 0x1f;
++      const char *name = xr17032_register_name (regr);
++      info->fprintf_func (info->stream, "%c%s", prefix, name);
++      break;
++    }
++    case regC:
++    {
++      reg regr = (bits >> 16) & 0x1f;
++      const char *name = xr17032_register_name (regr);
++      info->fprintf_func (info->stream, "%c%s", prefix, name);
++      break;
++    }
++    case regC_shift:
++    {
++      reg regr = (bits >> 16) & 0x1f;
++      reg_op op = (bits >> 26) & 3;
++      unsigned int val = (bits >> 21) & 0x1f;
++      const char *reg_name = xr17032_register_name (regr);
++      const char *op_name = xr17032_reg_op_name (op);
++      info->fprintf_func (info->stream, "%c%s %s %u", prefix, reg_name,
++			  op_name, val);
++      break;
++    }
++    case cregC:
++    {
++      creg cregr = (bits >> 16) & 0x1f;
++      const char *name = xr17032_control_reg_name (cregr);
++      info->fprintf_func (info->stream, "%c%s", prefix, name);
++      break;
++    }
++    case memimm8:
++      xr17032_print_memimm (info, bits, 0, prefix, index);
++      break;
++    case memimm16:
++      xr17032_print_memimm (info, bits, 1, prefix, index);
++      break;
++    case memimm32:
++      xr17032_print_memimm (info, bits, 2, prefix, index);
++      break;
++    case memreg8:
++      xr17032_print_memreg (info, bits, 0, prefix);
++      break;
++    case memreg16:
++      xr17032_print_memreg (info, bits, 1, prefix);
++      break;
++    case memreg32:
++      xr17032_print_memreg (info, bits, 2, prefix);
++      break;
++    }
++
++}
++
++static void
++xr17032_print_operands(struct disassemble_info *info, const inst *opcode,
++		       unsigned int bits, bfd_vma addr)
++{
++  for (int i = 0; i < XR17032_MAX_OPERANDS; i++)
++    {
++      operand_type type = opcode->operands[i];
++
++      if (type == dummy)
++	break;
++
++      xr17032_print_operand (info, type, bits, addr, i == 0 ? '\t' : ',', i);
++    }
++}
++
++int
++print_insn_xr17032 (bfd_vma memaddr, struct disassemble_info *info)
++{
++  unsigned int bits;
++  if (!xr17032_get_insn_data (&bits, memaddr, info))
++    return -1;
++
++  const inst *opcode = xr17032_find_opcode (bits);
++
++  if (!opcode)
++    {
++      info->fprintf_func (info->stream, "(bad)");
++      goto done;
++    }
++
++  info->fprintf_func (info->stream, "%s", opcode->mnemonic);
++  xr17032_print_operands (info, opcode, bits, memaddr);
++
++done:
++  return 4;
 +}
 diff -urN --no-dereference binutils-clean/opcodes/xr17032-opc.c binutils-workdir/opcodes/xr17032-opc.c
 --- binutils-clean/opcodes/xr17032-opc.c	1970-01-01 01:00:00.000000000 +0100
