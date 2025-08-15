@@ -1651,7 +1651,7 @@ diff -urN --no-dereference binutils-clean/gas/config/tc-xr17032.c binutils-workd
 +  if (fixP->fx_subsy != NULL)
 +    as_bad_subtract (fixP);
 +
-+  fixP->fx_addnumber = *valP;
++  fixP->fx_addnumber = 0;
 +}
 +
 +/* Prepare machine-dependent frags for relaxation.  */
