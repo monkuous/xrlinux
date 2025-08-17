@@ -347,7 +347,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gcc/config/xr17032/xr17032.h
 --- gcc-clean/gcc/config/xr17032/xr17032.h	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.h
-@@ -0,0 +1,187 @@
+@@ -0,0 +1,191 @@
 +/* Target Definitions for XR/17032.
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +   Contributed by monkuous.
@@ -532,7 +532,11 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gc
 +
 +#define DEFAULT_SIGNED_CHAR 0
 +
-+#define GLOBAL_ASM_OP "\t.globl\t"
++#define GLOBAL_ASM_OP 			"\t.globl\t"
++#define TEXT_SECTION_ASM_OP		"\t.text"
++#define DATA_SECTION_ASM_OP		"\t.data"
++#define READONLY_DATA_SECTION_ASM_OP	"\t.section\t.rodata"
++#define BSS_SECTION_ASM_OP		"\t.bss"
 +
 +#endif /* GCC_XR17032_H */
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/gcc/config/xr17032/xr17032.md
