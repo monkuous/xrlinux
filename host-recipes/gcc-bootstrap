@@ -1,0 +1,29 @@
+#! /bin/sh
+
+name=gcc-bootstrap
+from_source=gcc
+revision=1
+hostdeps="binutils"
+imagedeps="build-essential libgmp-dev libmpc-dev libmpfr-dev"
+
+configure() {
+    "${source_dir}"/configure               \
+            --prefix="${prefix}"            \
+            --target="${TRIPLE}"            \
+            --with-sysroot="${sysroot_dir}" \
+            --disable-nls                   \
+            --enable-languages=c,c++        \
+            --enable-default-pie            \
+            --without-headers               \
+            --disable-shared                \
+            --disable-threads               \
+            --disable-hosted-libstdcxx
+}
+
+build() {
+    make -j"${parallelism}" inhibit_libc=true all-gcc #all-target-libgcc
+}
+
+package() {
+    make -j"${parallelism}" DESTDIR="${dest_dir}" inhibit_libc=true install-gcc #install-target-libgcc
+}

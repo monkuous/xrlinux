@@ -1,0 +1,599 @@
+diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032-protos.h gcc-workdir/gcc/config/xr17032/xr17032-protos.h
+--- gcc-clean/gcc/config/xr17032/xr17032-protos.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc-workdir/gcc/config/xr17032/xr17032-protos.h
+@@ -0,0 +1,26 @@
++/* Prototypes for xr17032.cc functions used in the md file & elsewhere.
++   Copyright (C) 2025-2025 Free Software Foundation, Inc.
++
++   This file is part of GCC.
++
++   GCC is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation; either version 3, or (at your option)
++   any later version.
++
++   GCC is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with GCC; see the file COPYING3.  If not see
++   <http://www.gnu.org/licenses/>.  */
++
++#ifndef GCC_XR17032_PROTOS_H
++#define GCC_XR17032_PROTOS_H
++
++extern int xr17032_regno_ok_for_base_p (int, bool);
++extern poly_int64 xr17032_initial_elimination_offset (int, int);
++
++#endif /* GCC_XR17032_PROTOS_H */
+diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/gcc/config/xr17032/xr17032.cc
+--- gcc-clean/gcc/config/xr17032/xr17032.cc	1970-01-01 01:00:00.000000000 +0100
++++ gcc-workdir/gcc/config/xr17032/xr17032.cc
+@@ -0,0 +1,312 @@
++/* Target Code for XR/17032
++   Copyright (C) 2025-2025 Free Softwa*re Foundation, Inc.
++   Contributed by monkuous.
++   Based on the RISC-V target.
++
++   This file is part of GCC.
++
++   GCC is free software; you can redistribute it and/or modify it
++   under the terms of the GNU General Public License as published
++   by the Free Software Foundation; either version 3, or (at your
++   option) any later version.
++
++   GCC is distributed in the hope that it will be useful, but WITHOUT
++   ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
++   or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
++   License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with GCC; see the file COPYING3.  If not see
++   <http://www.gnu.org/licenses/>.  */
++
++#define IN_TARGET_CODE 1
++
++#include "config.h"
++#include "system.h"
++#include "coretypes.h"
++#include "target.h"
++#include "backend.h"
++#include "tm.h"
++#include "rtl.h"
++#include "regs.h"
++#include "insn-config.h"
++#include "insn-attr.h"
++#include "recog.h"
++#include "output.h"
++#include "alias.h"
++#include "tree.h"
++#include "stringpool.h"
++#include "attribs.h"
++#include "varasm.h"
++#include "stor-layout.h"
++#include "calls.h"
++#include "function.h"
++#include "explow.h"
++#include "ifcvt.h"
++#include "memmodel.h"
++#include "emit-rtl.h"
++#include "reload.h"
++#include "tm_p.h"
++#include "basic-block.h"
++#include "expr.h"
++#include "optabs.h"
++#include "bitmap.h"
++#include "df.h"
++#include "function-abi.h"
++#include "diagnostic.h"
++#include "builtins.h"
++#include "predict.h"
++#include "tree-pass.h"
++#include "opts.h"
++#include "tm-constrs.h"
++#include "rtl-iter.h"
++#include "gimple.h"
++#include "cfghooks.h"
++#include "cfgloop.h"
++#include "cfgrtl.h"
++#include "shrink-wrap.h"
++#include "sel-sched.h"
++#include "sched-int.h"
++#include "fold-const.h"
++#include "gimple-iterator.h"
++#include "gimple-expr.h"
++#include "tree-vectorizer.h"
++#include "gcse.h"
++#include "tree-dfa.h"
++#include "target-globals.h"
++#include "cgraph.h"
++#include "langhooks.h"
++#include "gimplify.h"
++
++/* This file should be included last.  */
++#include "target-def.h"
++
++/* Information about a function's frame layout.  */
++struct GTY(())  xr17032_frame_info {
++  /* The size of the frame in bytes.  */
++  poly_int64 total_size;
++
++  /* Bit X is set if the function saves or restores GPR X.  */
++  unsigned int mask;
++
++  /* Offsets of fixed-point save area from frame bottom */
++  poly_int64 gp_sp_offset;
++
++  /* Offset of virtual frame pointer from stack pointer/frame bottom */
++  poly_int64 frame_pointer_offset;
++
++  /* Offset of hard frame pointer from stack pointer/frame bottom */
++  poly_int64 hard_frame_pointer_offset;
++
++  /* The offset of arg_pointer_rtx from the bottom of the frame.  */
++  poly_int64 arg_pointer_offset;
++
++  /* Reset this struct, clean all field to zero.  */
++  void reset(void);
++};
++
++struct GTY(()) machine_function {
++  /* The number of extra stack bytes taken up by register varargs.
++     This area is allocated by the callee at the very top of the frame.  */
++  int varargs_size;
++
++  /* True if current function is a naked function.  */
++  bool naked_p;
++
++  /* True if attributes on current function have been checked.  */
++  bool attributes_checked_p;
++
++  /* True if RA must be saved because of a far jump.  */
++  bool far_jump_used;
++
++  /* The current frame information, calculated by xr17032_compute_frame_info.  */
++  struct xr17032_frame_info frame;
++};
++
++void xr17032_frame_info::reset(void)
++{
++  total_size = 0;
++  mask = 0;
++
++  gp_sp_offset = 0;
++
++  frame_pointer_offset = 0;
++
++  hard_frame_pointer_offset = 0;
++
++  arg_pointer_offset = 0;
++}
++
++int
++xr17032_regno_ok_for_base_p (int regno, bool strict_p)
++{
++  if (regno >= FIRST_PSEUDO_REGISTER)
++    {
++      if (!strict_p)
++	return true;
++      regno = reg_renumber[regno];
++    }
++
++  if (regno == ARG_POINTER_REGNUM || regno == FRAME_POINTER_REGNUM)
++    return true;
++
++  return REGNO_REG_CLASS (regno) == GENERAL_REGS;
++}
++
++static bool
++xr17032_far_jump_used_p ()
++{
++  size_t func_size = 0;
++
++  if (cfun->machine->far_jump_used)
++    return true;
++
++  /* We can't change far_jump_used during or after reload, as there is
++     no chance to change stack frame layout.  So we must rely on the
++     conservative heuristic below having done the right thing.  */
++  if (reload_in_progress || reload_completed)
++    return false;
++
++  /* Estimate the function length.  */
++  for (rtx_insn *insn = get_insns (); insn; insn = NEXT_INSN (insn))
++    func_size += get_attr_length (insn);
++
++  /* Conservatively determine whether some jump might exceed 4 MiB
++     displacement.  */
++  if (func_size * 4 >= 0x400000)
++    cfun->machine->far_jump_used = true;
++
++  return cfun->machine->far_jump_used;
++}
++
++static bool
++xr17032_save_return_addr_reg_p (void)
++{
++  /* The lr register is call-clobbered: if this is not a leaf function,
++     save it.  */
++  if (!crtl->is_leaf)
++    return true;
++
++  /* We need to save the incoming return address if __builtin_eh_return
++     is being used to set a different return address.  */
++  if (crtl->calls_eh_return)
++    return true;
++
++  /* Far jumps/branches use lr as a temporary to set up the target jump
++     location (clobbering the incoming return address).  */
++  if (xr17032_far_jump_used_p ())
++    return true;
++
++  /* We need to save it if anyone has used that.  */
++  if (df_regs_ever_live_p (XR17032_LR))
++    return true;
++
++  return false;
++}
++
++static bool
++xr17032_save_reg_p (unsigned int regno)
++{
++  bool call_saved = !global_regs[regno] && !call_used_or_fixed_reg_p (regno);
++  bool might_clobber = crtl->saves_all_registers
++		       || df_regs_ever_live_p (regno);
++
++  if (call_saved && might_clobber)
++    return true;
++
++  if (regno == HARD_FRAME_POINTER_REGNUM && frame_pointer_needed)
++    return true;
++
++  if (regno == XR17032_LR && xr17032_save_return_addr_reg_p ())
++    return true;
++
++  return false;
++}
++
++static void
++xr17032_compute_frame_info (void)
++{
++  struct xr17032_frame_info *frame;
++  poly_int64 offset;
++  unsigned int regno, i, num_x_saved = 0, x_save_size = 0;
++
++  frame = &cfun->machine->frame;
++
++  /* Adjust the outgoing arguments size if required.  Keep it in sync with what
++     the mid-end is doing.  */
++  crtl->outgoing_args_size = STACK_DYNAMIC_OFFSET (cfun);
++
++  frame->reset();
++
++  if (!cfun->machine->naked_p)
++    {
++      /* Find out which GPRs we need to save.  */
++      for (regno = 0; regno <= 31; regno++)
++	if (xr17032_save_reg_p (regno))
++	  frame->mask |= 1 << regno, num_x_saved++;
++
++      /* If this function calls eh_return, we must also save and restore the
++	 EH data registers.  */
++      if (crtl->calls_eh_return)
++	for (i = 0; (regno = EH_RETURN_DATA_REGNO (i)) != INVALID_REGNUM; i++)
++	  frame->mask |= 1 << regno, num_x_saved++;
++    }
++
++  if (frame->mask)
++    {
++      x_save_size = num_x_saved * UNITS_PER_WORD;
++    }
++
++  /* At the bottom of the frame are any outgoing stack arguments. */
++  offset = (crtl->outgoing_args_size + 3) & ~3;
++  /* Next are local stack variables. */
++  offset += (get_frame_size () + 3) & ~3;
++  /* The virtual frame pointer points above the local variables. */
++  frame->frame_pointer_offset = offset;
++  /* Next are the callee-saved GPRs. */
++  if (frame->mask)
++    {
++      offset += x_save_size;
++    }
++  frame->gp_sp_offset = offset - UNITS_PER_WORD;
++  /* The hard frame pointer points above the callee-saved GPRs. */
++  frame->hard_frame_pointer_offset = offset;
++  /* Above the hard frame pointer is the callee-allocated varags save area. */
++  offset += (cfun->machine->varargs_size + 3) & ~3;
++  /* Next is the callee-allocated area for pretend stack arguments.  */
++  offset += (crtl->args.pretend_args_size + 3) & ~3;
++  /* Arg pointer must be below pretend args, but must be above alignment
++     padding.  */
++  frame->arg_pointer_offset = offset - crtl->args.pretend_args_size;
++  frame->total_size = offset;
++
++  /* Next points the incoming stack pointer and any incoming arguments. */
++}
++
++poly_int64
++xr17032_initial_elimination_offset (int from, int to)
++{
++  poly_int64 src, dest;
++
++  xr17032_compute_frame_info ();
++
++  if (to == HARD_FRAME_POINTER_REGNUM)
++    dest = cfun->machine->frame.hard_frame_pointer_offset;
++  else if (to == STACK_POINTER_REGNUM)
++    dest = 0; /* The stack pointer is the base of all offsets, hence 0.  */
++  else
++    gcc_unreachable ();
++
++  if (from == FRAME_POINTER_REGNUM)
++    src = cfun->machine->frame.frame_pointer_offset;
++  else if (from == ARG_POINTER_REGNUM)
++    src = cfun->machine->frame.arg_pointer_offset;
++  else
++    gcc_unreachable ();
++
++  return src - dest;
++}
++
++struct gcc_target targetm = TARGET_INITIALIZER;
++
++#include "gt-xr17032.h"
+diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gcc/config/xr17032/xr17032.h
+--- gcc-clean/gcc/config/xr17032/xr17032.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc-workdir/gcc/config/xr17032/xr17032.h
+@@ -0,0 +1,187 @@
++/* Target Definitions for XR/17032.
++   Copyright (C) 2025-2025 Free Software Foundation, Inc.
++   Contributed by monkuous.
++
++   This file is part of GCC.
++
++   GCC is free software; you can redistribute it and/or modify it
++   under the terms of the GNU General Public License as published
++   by the Free Software Foundation; either version 3, or (at your
++   option) any later version.
++
++   GCC is distributed in the hope that it will be useful, but WITHOUT
++   ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
++   or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
++   License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with GCC; see the file COPYING3.  If not see
++   <http://www.gnu.org/licenses/>.  */
++
++#ifndef GCC_XR17032_H
++#define GCC_XR17032_H
++
++#define TARGET_CPU_CPP_BUILTINS() 	\
++  { 					\
++    builtin_define_std ("xr17032");	\
++  }
++
++#define REGISTER_NAMES {				\
++  "zero", "t0", "t1", "t2", "t3", "t4", "t5", "a0",	\
++  "a1", "a2", "a3", "s0", "s1", "s2", "s3", "s4",	\
++  "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12",	\
++  "s13", "s14", "s15", "s16", "s17", "tp", "sp", "lr",	\
++  "frame", "arg" }
++
++#define XR17032_ZERO 0
++#define XR17032_T0 1
++#define XR17032_T1 2
++#define XR17032_T2 3
++#define XR17032_T3 4
++#define XR17032_T4 5
++#define XR17032_T5 6
++#define XR17032_A0 7
++#define XR17032_A1 8
++#define XR17032_A2 9
++#define XR17032_A3 10
++#define XR17032_S0 11
++#define XR17032_S1 12
++#define XR17032_S2 13
++#define XR17032_S3 14
++#define XR17032_S4 15
++#define XR17032_S5 16
++#define XR17032_S6 17
++#define XR17032_S7 18
++#define XR17032_S8 19
++#define XR17032_S9 20
++#define XR17032_S10 21
++#define XR17032_S11 22
++#define XR17032_S12 23
++#define XR17032_S13 24
++#define XR17032_S14 25
++#define XR17032_S15 26
++#define XR17032_S16 27
++#define XR17032_S17 28
++#define XR17032_TP 29
++#define XR17032_SP 30
++#define XR17032_LR 31
++#define XR17032_FRAME 32
++#define XR17032_ARG 33
++
++#define FIRST_PSEUDO_REGISTER 34
++
++#define STACK_POINTER_REGNUM		XR17032_SP
++#define FRAME_POINTER_REGNUM		XR17032_FRAME
++#define ARG_POINTER_REGNUM		XR17032_ARG
++#define HARD_FRAME_POINTER_REGNUM 	XR17032_S0
++
++#define FUNCTION_ARG_REGNO_P(r) ((r) >= XR17032_A0 && (r) <= XR17032_A3)
++
++#define ELIMINABLE_REGS	{				\
++  { ARG_POINTER_REGNUM, STACK_POINTER_REGNUM },		\
++  { ARG_POINTER_REGNUM, HARD_FRAME_POINTER_REGNUM },	\
++  { FRAME_POINTER_REGNUM, STACK_POINTER_REGNUM },	\
++  { FRAME_POINTER_REGNUM, HARD_FRAME_POINTER_REGNUM } }
++
++#define INIT_CUMULATIVE_ARGS(CUM,FNTYPE,LIBNAME,FNDECL,N_NAMED_ARGS) \
++  (CUM = XR17032_A0)
++
++enum reg_class
++{
++  NO_REGS,
++  GENERAL_REGS,
++  ALL_REGS,
++  LIM_REG_CLASSES
++};
++
++#define REGNO_REG_CLASS(R) (((R) < XR17032_FRAME) ? GENERAL_REGS : ALL_REGS)
++
++#define REG_CLASS_CONTENTS {					\
++  { 0x00000000, 0x00000000 },  /* Empty */			\
++  { 0xFFFFFFFF, 0x00000000 },  /* General registers */		\
++  { 0xFFFFFFFF, 0x00000003 } } /* All registers */
++
++#define N_REG_CLASSES LIM_REG_CLASSES
++
++#define REG_CLASS_NAMES {	\
++  "NO_REGS",			\
++  "GENERAL_REGS",		\
++  "ALL_REGS" }
++
++/* unwritable: zero, tp, sp, lr, frame, arg */
++#define FIXED_REGISTERS {	\
++  1, 0, 0, 0, 0, 0, 0, 0,	\
++  0, 0, 0, 0, 0, 0, 0, 0,	\
++  0, 0, 0, 0, 0, 0, 0, 0,	\
++  0, 0, 0, 0, 0, 1, 1, 1,	\
++  1, 1 }
++
++/* call-clobbered: t0-t5, a0-a3, lr */
++#define CALL_REALLY_USED_REGISTERS {	\
++  0, 1, 1, 1, 1, 1, 1, 1,		\
++  1, 1, 1, 0, 0, 0, 0, 0,		\
++  0, 0, 0, 0, 0, 0, 0, 0,		\
++  0, 0, 0, 0, 0, 0, 0, 1,		\
++  0, 0 }
++
++#define BASE_REG_CLASS GENERAL_REGS
++#define INDEX_REG_CLASS GENERAL_REGS
++
++#ifndef REG_OK_STRICT
++#define REGNO_OK_FOR_BASE_P(X) \
++  xr17032_regno_ok_for_base_p ((X), 0)
++#else
++#define REGNO_OK_FOR_BASE_P(X) \
++  xr17032_regno_ok_for_base_p ((X), 1)
++#endif
++
++#define REGNO_OK_FOR_INDEX_P REGNO_OK_FOR_BASE_P
++
++#define UNITS_PER_WORD 4
++
++#define CUMULATIVE_ARGS unsigned int
++
++#define MOVE_MAX 4
++
++#define Pmode SImode
++#define FUNCTION_MODE SImode
++#define CASE_VECTOR_MODE SImode
++
++#define TRAMPOLINE_SIZE 12
++#define TRAMPOLINE_ALIGNMENT 32
++
++#define STRICT_ALIGNMENT 1
++
++#define FUNCTION_BOUNDARY 32
++
++#define BITS_BIG_ENDIAN 0
++#define BYTES_BIG_ENDIAN 0
++#define WORDS_BIG_ENDIAN 0
++
++#define BIGGEST_ALIGNMENT 32
++
++#define MAX_REGS_PER_ADDRESS 1
++
++#define STACK_BOUNDARY 32
++#define PARM_BOUNDARY 32
++
++#define SLOW_BYTE_ACCESS 1
++
++#define FUNCTION_PROFILER(FILE,LABELNO) (abort (), 0)
++
++#define ASM_OUTPUT_ALIGN(STREAM,POWER) \
++  fprintf (STREAM, "\t.p2align\t%d\n", POWER);
++
++#define FIRST_PARM_OFFSET(F) 0
++
++#define INITIAL_ELIMINATION_OFFSET(FROM, TO, OFFSET) \
++  (OFFSET) = xr17032_initial_elimination_offset (FROM, TO)
++
++#define STACK_DYNAMIC_OFFSET(FUNDECL) \
++  (crtl->outgoing_args_size + STACK_POINTER_OFFSET)
++
++#define DEFAULT_SIGNED_CHAR 0
++
++#define GLOBAL_ASM_OP "\t.globl\t"
++
++#endif /* GCC_XR17032_H */
+diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/gcc/config/xr17032/xr17032.md
+--- gcc-clean/gcc/config/xr17032/xr17032.md	1970-01-01 01:00:00.000000000 +0100
++++ gcc-workdir/gcc/config/xr17032/xr17032.md
+@@ -0,0 +1,31 @@
++;; Machine description for XR/17032
++;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
++;; Contributed by monkuous
++
++;; This file is part of GCC.
++
++;; GCC is free software; you can redistribute it and/or modify it
++;; under the terms of the GNU General Public License as published
++;; by the Free Software Foundation; either version 3, or (at your
++;; option) any later version.
++
++;; GCC is distributed in the hope that it will be useful, but WITHOUT
++;; ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
++;; or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
++;; License for more details.
++
++;; You should have received a copy of the GNU General Public License
++;; along with GCC; see the file COPYING3.  If not see
++;; <http://www.gnu.org/licenses/>.
++
++; Instructions are four bytes long.
++(define_attr "length" "" (const_int 4))
++
++;; -------------------------------------------------------------------------
++;; nop instruction
++;; -------------------------------------------------------------------------
++
++(define_insn "nop"
++  [(const_int 0)]
++  ""
++  "addi zero, zero, 0")
+diff -urN --no-dereference gcc-clean/gcc/config.gcc gcc-workdir/gcc/config.gcc
+--- gcc-clean/gcc/config.gcc
++++ gcc-workdir/gcc/config.gcc
+@@ -593,6 +593,10 @@
+ 	extra_headers="c6x_intrinsics.h"
+ 	extra_options="${extra_options} c6x/c6x-tables.opt"
+ 	;;
++xr17032-*-*)
++	cpu_type=xr17032
++	target_has_targetm_common=no
++	;;
+ xtensa*-*-*)
+ 	extra_options="${extra_options} fused-madd.opt"
+ 	extra_objs="xtensa-dynconfig.o"
+@@ -3606,6 +3610,12 @@
+ 	tm_file="elfos.h ${tm_file} visium/elf.h newlib-stdint.h"
+ 	tmake_file="visium/t-visium visium/t-crtstuff"
+ 	;;
++xr17032-*-elf*)
++	tm_file="${tm_file} elfos.h newlib-stdint.h"
++	;;
++xr17032-*-linux*)
++	tm_file="${tm_file} elfos.h gnu-user.h linux.h glibc-stdint.h"
++	;;
+ xstormy16-*-elf)
+ 	# For historical reasons, the target files omit the 'x'.
+ 	tm_file="elfos.h newlib-stdint.h stormy16/stormy16.h"
