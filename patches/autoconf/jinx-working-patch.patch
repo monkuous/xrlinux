@@ -6,7 +6,7 @@ diff -urN --no-dereference autoconf-clean/build-aux/config.guess autoconf-workdi
  	GUESS=$CPU-pc-linux-$LIBCABI
  	;;
 +    xr17032:Linux:*:*)
-+	GUESS=$UNAME_MACINE-unknown-linux-$LIBC
++	GUESS=$UNAME_MACHINE-unknown-linux-$LIBC
 +	;;
      xtensa*:Linux:*:*)
  	GUESS=$UNAME_MACHINE-unknown-linux-$LIBC
