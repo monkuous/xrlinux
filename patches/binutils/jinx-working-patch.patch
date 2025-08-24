@@ -73,7 +73,7 @@ diff -urN --no-dereference binutils-clean/bfd/bfd-in2.h binutils-workdir/bfd/bfd
    bfd_arch_last
    };
  
-@@ -6208,6 +6210,17 @@
+@@ -6208,6 +6210,18 @@
    BFD_RELOC_IQ2000_OFFSET_21,
    BFD_RELOC_IQ2000_UHI16,
  
@@ -84,6 +84,7 @@ diff -urN --no-dereference binutils-clean/bfd/bfd-in2.h binutils-workdir/bfd/bfd
 +  BFD_RELOC_XR17032_IMM16_2,
 +  BFD_RELOC_XR17032_IMM16_16,
 +  BFD_RELOC_XR17032_SIMM16,
++  BFD_RELOC_XR17032_DISP16_16,
 +  BFD_RELOC_XR17032_SIMM5,
 +  BFD_RELOC_XR17032_DISP21,
 +  BFD_RELOC_XR17032_SHAMT,
@@ -202,7 +203,7 @@ diff -urN --no-dereference binutils-clean/bfd/cpu-xr17032.c binutils-workdir/bfd
 diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/bfd/elf32-xr17032.c
 --- binutils-clean/bfd/elf32-xr17032.c	1970-01-01 01:00:00.000000000 +0100
 +++ binutils-workdir/bfd/elf32-xr17032.c
-@@ -0,0 +1,334 @@
+@@ -0,0 +1,348 @@
 +/* BFD back-end for XR/17032 ELF
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +   Written by monkuous.
@@ -231,7 +232,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +#include "elf-bfd.h"
 +#include "elf/xr17032.h"
 +
-+#define USE_REL 1
++#define USE_REL 0
 +
 +/* xr17032_reloc_map array maps BFD relocation enum into a XR/17032 relocation type.  */
 +
@@ -243,22 +244,23 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +
 +static const struct xr17032_reloc_map xr17032_reloc_map[R_XR17032_MAX] =
 +{
-+  {BFD_RELOC_NONE,	       R_XR17032_NONE},
-+  {BFD_RELOC_XR17032_IMM29,    R_XR17032_IMM29},
-+  {BFD_RELOC_XR17032_IMM16,    R_XR17032_IMM16},
-+  {BFD_RELOC_XR17032_IMM16_1,  R_XR17032_IMM16_1},
-+  {BFD_RELOC_XR17032_IMM16_2,  R_XR17032_IMM16_2},
-+  {BFD_RELOC_XR17032_IMM16_16, R_XR17032_IMM16_16},
-+  {BFD_RELOC_XR17032_SIMM16,   R_XR17032_SIMM16},
-+  {BFD_RELOC_XR17032_SIMM5,    R_XR17032_SIMM5},
-+  {BFD_RELOC_XR17032_DISP21,   R_XR17032_DISP21},
-+  {BFD_RELOC_XR17032_SHAMT,    R_XR17032_SHAMT},
-+  {BFD_RELOC_8,		       R_XR17032_ABS8},
-+  {BFD_RELOC_16,	       R_XR17032_ABS16},
-+  {BFD_RELOC_32,	       R_XR17032_ABS32},
-+  {BFD_RELOC_8_PCREL,	       R_XR17032_PCREL8},
-+  {BFD_RELOC_16_PCREL,	       R_XR17032_PCREL16},
-+  {BFD_RELOC_32_PCREL,	       R_XR17032_PCREL32},
++  {BFD_RELOC_NONE,	        R_XR17032_NONE},
++  {BFD_RELOC_XR17032_IMM29,     R_XR17032_IMM29},
++  {BFD_RELOC_XR17032_IMM16,     R_XR17032_IMM16},
++  {BFD_RELOC_XR17032_IMM16_1,   R_XR17032_IMM16_1},
++  {BFD_RELOC_XR17032_IMM16_2,   R_XR17032_IMM16_2},
++  {BFD_RELOC_XR17032_IMM16_16,  R_XR17032_IMM16_16},
++  {BFD_RELOC_XR17032_SIMM16,    R_XR17032_SIMM16},
++  {BFD_RELOC_XR17032_DISP16_16, R_XR17032_DISP16_16},
++  {BFD_RELOC_XR17032_SIMM5,     R_XR17032_SIMM5},
++  {BFD_RELOC_XR17032_DISP21,    R_XR17032_DISP21},
++  {BFD_RELOC_XR17032_SHAMT,     R_XR17032_SHAMT},
++  {BFD_RELOC_8,		        R_XR17032_ABS8},
++  {BFD_RELOC_16,	        R_XR17032_ABS16},
++  {BFD_RELOC_32,	        R_XR17032_ABS32},
++  {BFD_RELOC_8_PCREL,	        R_XR17032_PCREL8},
++  {BFD_RELOC_16_PCREL,	        R_XR17032_PCREL16},
++  {BFD_RELOC_32_PCREL,	        R_XR17032_PCREL32},
 +};
 +
 +static reloc_howto_type xr17032_elf_howto_table[] =
@@ -272,7 +274,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 complain_overflow_dont,     /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_NONE",	     /* name */
-+	 true,			     /* partial_inplace */
++	 false,			     /* partial_inplace */
 +	 0,			     /* src_mask */
 +	 0,			     /* dst_mask */
 +	 false),		     /* pcrel_offset */
@@ -285,8 +287,8 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 complain_overflow_unsigned, /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_IMM29",	     /* name */
-+	 true,			     /* partial_inplace */
-+	 0xfffffff8,		     /* src_mask */
++	 false,			     /* partial_inplace */
++	 0x00000000,		     /* src_mask */
 +	 0xfffffff8,		     /* dst_mask */
 +	 false),		     /* pcrel_offset */
 +  HOWTO (R_XR17032_IMM16,	     /* type */
@@ -298,8 +300,8 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 complain_overflow_unsigned, /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_IMM16",	     /* name */
-+	 true,			     /* partial_inplace */
-+	 0xffff0000,		     /* src_mask */
++	 false,			     /* partial_inplace */
++	 0x00000000,		     /* src_mask */
 +	 0xffff0000,		     /* dst_mask */
 +	 false),		     /* pcrel_offset */
 +  HOWTO (R_XR17032_IMM16_1,	     /* type */
@@ -311,8 +313,8 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 complain_overflow_unsigned, /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_IMM16_1",	     /* name */
-+	 true,			     /* partial_inplace */
-+	 0xffff0000,		     /* src_mask */
++	 false,			     /* partial_inplace */
++	 0x00000000,		     /* src_mask */
 +	 0xffff0000,		     /* dst_mask */
 +	 false),		     /* pcrel_offset */
 +  HOWTO (R_XR17032_IMM16_2,	     /* type */
@@ -324,8 +326,8 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 complain_overflow_unsigned, /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_IMM16_2",	     /* name */
-+	 true,			     /* partial_inplace */
-+	 0xffff0000,		     /* src_mask */
++	 false,			     /* partial_inplace */
++	 0x00000000,		     /* src_mask */
 +	 0xffff0000,		     /* dst_mask */
 +	 false),		     /* pcrel_offset */
 +  HOWTO (R_XR17032_IMM16_16,	     /* type */
@@ -337,8 +339,8 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 complain_overflow_unsigned, /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_IMM16_16",	     /* name */
-+	 true,			     /* partial_inplace */
-+	 0xffff0000,		     /* src_mask */
++	 false,			     /* partial_inplace */
++	 0x00000000,		     /* src_mask */
 +	 0xffff0000,		     /* dst_mask */
 +	 false),		     /* pcrel_offset */
 +  HOWTO (R_XR17032_SIMM16,	     /* type */
@@ -350,8 +352,21 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 complain_overflow_signed,   /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_SIMM16",	     /* name */
-+	 true,			     /* partial_inplace */
-+	 0xffff0000,		     /* src_mask */
++	 false,			     /* partial_inplace */
++	 0x00000000,		     /* src_mask */
++	 0xffff0000,		     /* dst_mask */
++	 false),		     /* pcrel_offset */
++  HOWTO (R_XR17032_DISP16_16,	     /* type */
++	 16,			     /* rightshift */
++	 4,			     /* size */
++	 16,			     /* bitsize */
++	 true,			     /* pc_relative */
++	 16,			     /* bitpos */
++	 complain_overflow_signed,   /* complain_on_overflow */
++	 bfd_elf_generic_reloc,	     /* special_function */
++	 "R_XR17032_DISP16_16",	     /* name */
++	 false,			     /* partial_inplace */
++	 0x00000000,		     /* src_mask */
 +	 0xffff0000,		     /* dst_mask */
 +	 false),		     /* pcrel_offset */
 +  HOWTO (R_XR17032_SIMM5,	     /* type */
@@ -363,8 +378,8 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 complain_overflow_signed,   /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_SIMM5",	     /* name */
-+	 true,			     /* partial_inplace */
-+	 0x0000f800,		     /* src_mask */
++	 false,			     /* partial_inplace */
++	 0x00000000,		     /* src_mask */
 +	 0x0000f800,		     /* dst_mask */
 +	 false),		     /* pcrel_offset */
 +  HOWTO (R_XR17032_DISP21,	     /* type */
@@ -376,8 +391,8 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 complain_overflow_signed,   /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_DISP21",	     /* name */
-+	 true,			     /* partial_inplace */
-+	 0xfffff800,		     /* src_mask */
++	 false,			     /* partial_inplace */
++	 0x00000000,		     /* src_mask */
 +	 0xfffff800,		     /* dst_mask */
 +	 false),		     /* pcrel_offset */
 +  HOWTO (R_XR17032_SHAMT,	     /* type */
@@ -389,8 +404,8 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 complain_overflow_signed,   /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_SHAMT",	     /* name */
-+	 true,			     /* partial_inplace */
-+	 0x03e00000,		     /* src_mask */
++	 false,			     /* partial_inplace */
++	 0x00000000,		     /* src_mask */
 +	 0x03e00000,		     /* dst_mask */
 +	 false),		     /* pcrel_offset */
 +  HOWTO (R_XR17032_ABS8,	     /* type */
@@ -402,8 +417,8 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 complain_overflow_signed,   /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_ABS8",	     /* name */
-+	 true,			     /* partial_inplace */
-+	 0xff,			     /* src_mask */
++	 false,			     /* partial_inplace */
++	 0x00,			     /* src_mask */
 +	 0xff,			     /* dst_mask */
 +	 false),		     /* pcrel_offset */
 +  HOWTO (R_XR17032_ABS16,	     /* type */
@@ -415,8 +430,8 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 complain_overflow_signed,   /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_ABS16",	     /* name */
-+	 true,			     /* partial_inplace */
-+	 0xffff,		     /* src_mask */
++	 false,			     /* partial_inplace */
++	 0x0000,		     /* src_mask */
 +	 0xffff,		     /* dst_mask */
 +	 false),		     /* pcrel_offset */
 +  HOWTO (R_XR17032_ABS32,	     /* type */
@@ -428,8 +443,8 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 complain_overflow_signed,   /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_ABS32",	     /* name */
-+	 true,			     /* partial_inplace */
-+	 0xffffffff,		     /* src_mask */
++	 false,			     /* partial_inplace */
++	 0x00000000,		     /* src_mask */
 +	 0xffffffff,		     /* dst_mask */
 +	 false),		     /* pcrel_offset */
 +  HOWTO (R_XR17032_PCREL8,	     /* type */
@@ -441,8 +456,8 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 complain_overflow_signed,   /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_PCREL8",	     /* name */
-+	 true,			     /* partial_inplace */
-+	 0xff,			     /* src_mask */
++	 false,			     /* partial_inplace */
++	 0x00,			     /* src_mask */
 +	 0xff,			     /* dst_mask */
 +	 false),		     /* pcrel_offset */
 +  HOWTO (R_XR17032_PCREL16,	     /* type */
@@ -454,8 +469,8 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 complain_overflow_signed,   /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_PCREL16",	     /* name */
-+	 true,			     /* partial_inplace */
-+	 0xffff,		     /* src_mask */
++	 false,			     /* partial_inplace */
++	 0x0000,		     /* src_mask */
 +	 0xffff,		     /* dst_mask */
 +	 false),		     /* pcrel_offset */
 +  HOWTO (R_XR17032_PCREL32,	     /* type */
@@ -467,8 +482,8 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 complain_overflow_signed,   /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_PCREL32",	     /* name */
-+	 true,			     /* partial_inplace */
-+	 0xffffffff,		     /* src_mask */
++	 false,			     /* partial_inplace */
++	 0x00000000,		     /* src_mask */
 +	 0xffffffff,		     /* dst_mask */
 +	 false),		     /* pcrel_offset */
 +};
@@ -540,7 +555,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 diff -urN --no-dereference binutils-clean/bfd/libbfd.h binutils-workdir/bfd/libbfd.h
 --- binutils-clean/bfd/libbfd.h
 +++ binutils-workdir/bfd/libbfd.h
-@@ -2910,6 +2910,15 @@
+@@ -2910,6 +2910,16 @@
    "BFD_RELOC_IQ2000_OFFSET_16",
    "BFD_RELOC_IQ2000_OFFSET_21",
    "BFD_RELOC_IQ2000_UHI16",
@@ -550,6 +565,7 @@ diff -urN --no-dereference binutils-clean/bfd/libbfd.h binutils-workdir/bfd/libb
 +  "BFD_RELOC_XR17032_IMM16_2",
 +  "BFD_RELOC_XR17032_IMM16_16",
 +  "BFD_RELOC_XR17032_SIMM16",
++  "BFD_RELOC_XR17032_DISP16_16",
 +  "BFD_RELOC_XR17032_SIMM5",
 +  "BFD_RELOC_XR17032_DISP21",
 +  "BFD_RELOC_XR17032_SHAMT",
@@ -559,7 +575,7 @@ diff -urN --no-dereference binutils-clean/bfd/libbfd.h binutils-workdir/bfd/libb
 diff -urN --no-dereference binutils-clean/bfd/reloc.c binutils-workdir/bfd/reloc.c
 --- binutils-clean/bfd/reloc.c
 +++ binutils-workdir/bfd/reloc.c
-@@ -6244,6 +6244,27 @@
+@@ -6244,6 +6244,29 @@
    IQ2000 Relocations.
  
  ENUM
@@ -574,6 +590,8 @@ diff -urN --no-dereference binutils-clean/bfd/reloc.c binutils-workdir/bfd/reloc
 +  BFD_RELOC_XR17032_IMM16_16
 +ENUMX
 +  BFD_RELOC_XR17032_SIMM16
++ENUMX
++  BFD_RELOC_XR17032_DISP16_16
 +ENUMX
 +  BFD_RELOC_XR17032_SIMM5
 +ENUMX
@@ -701,7 +719,7 @@ diff -urN --no-dereference binutils-clean/gas/Makefile.am binutils-workdir/gas/M
 diff -urN --no-dereference binutils-clean/gas/config/tc-xr17032.c binutils-workdir/gas/config/tc-xr17032.c
 --- binutils-clean/gas/config/tc-xr17032.c	1970-01-01 01:00:00.000000000 +0100
 +++ binutils-workdir/gas/config/tc-xr17032.c
-@@ -0,0 +1,940 @@
+@@ -0,0 +1,948 @@
 +/* tc-xr17032.c -- Assembler code for the XR/17032 CPU core.
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +
@@ -1089,6 +1107,7 @@ diff -urN --no-dereference binutils-clean/gas/config/tc-xr17032.c binutils-workd
 +    case imm16_16:
 +    case imm16_2:
 +    case disp21:
++    case disp16_16:
 +      return xr17032_parse_constant (out, text);
 +    case regA:
 +    case regB:
@@ -1418,10 +1437,10 @@ diff -urN --no-dereference binutils-clean/gas/config/tc-xr17032.c binutils-workd
 +	  rtype = BFD_RELOC_XR17032_IMM16_16;
 +	  imm = &insn->arguments[i].constant_val;
 +	  break;
-+    case imm16_2:
-+      rtype = BFD_RELOC_XR17032_IMM16_2;
-+      imm = &insn->arguments[i].constant_val;
-+      break;
++	case imm16_2:
++	  rtype = BFD_RELOC_XR17032_IMM16_2;
++	  imm = &insn->arguments[i].constant_val;
++	  break;
 +	case simm16:
 +	  rtype = BFD_RELOC_XR17032_SIMM16;
 +	  imm = &insn->arguments[i].constant_val;
@@ -1432,6 +1451,10 @@ diff -urN --no-dereference binutils-clean/gas/config/tc-xr17032.c binutils-workd
 +	  break;
 +	case disp21:
 +	  rtype = BFD_RELOC_XR17032_DISP21;
++	  imm = &insn->arguments[i].constant_val;
++	  break;
++	case disp16_16:
++	  rtype = BFD_RELOC_XR17032_DISP16_16;
 +	  imm = &insn->arguments[i].constant_val;
 +	  break;
 +	case regA:
@@ -1601,6 +1624,9 @@ diff -urN --no-dereference binutils-clean/gas/config/tc-xr17032.c binutils-workd
 +    case BFD_RELOC_XR17032_DISP21:
 +      bits = ((*valP >> 2) & 0x1fffff) << 11;
 +      break;
++    case BFD_RELOC_XR17032_DISP16_16:
++      bits = ((*valP >> 16) & 0xffff) << 16;
++      break;
 +    case BFD_RELOC_XR17032_SHAMT:
 +      bits = (*valP & 0x1f) << 21;
 +      break;
@@ -1630,7 +1656,7 @@ diff -urN --no-dereference binutils-clean/gas/config/tc-xr17032.c binutils-workd
 +  if (fixP->fx_subsy != NULL)
 +    as_bad_subtract (fixP);
 +
-+  fixP->fx_addnumber = 0;
++  fixP->fx_addnumber = *valP;
 +}
 +
 +/* Prepare machine-dependent frags for relaxation.  */
@@ -1759,7 +1785,7 @@ diff -urN --no-dereference binutils-clean/include/elf/xr17032.h binutils-workdir
 +  RELOC_NUMBER (R_XR17032_IMM16_2,     4)
 +  RELOC_NUMBER (R_XR17032_IMM16_16,    5)
 +  RELOC_NUMBER (R_XR17032_SIMM16,      6)
-+  /* 7 is unused */
++  RELOC_NUMBER (R_XR17032_DISP16_16,   7)
 +  RELOC_NUMBER (R_XR17032_SIMM5,       8)
 +  RELOC_NUMBER (R_XR17032_DISP21,      9)
 +  RELOC_NUMBER (R_XR17032_SHAMT,       10)
@@ -1840,7 +1866,7 @@ diff -urN --no-dereference binutils-clean/include/opcode/xr17032.h binutils-work
 +  dummy = 0,
 +  imm29, imm16, imm16_16, imm16_2,
 +  simm16, simm5,
-+  disp21,
++  disp21, disp16_16,
 +  regA, regB, regC, regC_shift, cregC,
 +  memimm8, memimm16, memimm32,
 +  memreg8, memreg16, memreg32,
@@ -2004,7 +2030,7 @@ diff -urN --no-dereference binutils-clean/opcodes/disassemble.h binutils-workdir
 diff -urN --no-dereference binutils-clean/opcodes/xr17032-dis.c binutils-workdir/opcodes/xr17032-dis.c
 --- binutils-clean/opcodes/xr17032-dis.c	1970-01-01 01:00:00.000000000 +0100
 +++ binutils-workdir/opcodes/xr17032-dis.c
-@@ -0,0 +1,349 @@
+@@ -0,0 +1,362 @@
 +/* Disassembler code for XR/17032.
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +   Contributed by monkuous
@@ -2258,6 +2284,19 @@ diff -urN --no-dereference binutils-clean/opcodes/xr17032-dis.c binutils-workdir
 +      info->print_address_func (value, info);
 +      break;
 +    }
++    case disp16_16:
++    {
++      bfd_vma value = bits & 0xffff0000;
++
++      if (value & 0x80000000)
++	value = addr - (0x80000000 - (value & 0x7fffffff));
++      else
++	value += addr;
++
++      info->fprintf_func (info->stream, "%c", prefix);
++      info->print_address_func (value, info);
++      break;
++    }
 +    case regA:
 +    {
 +      reg regr = (bits >> 6) & 0x1f;
@@ -2357,7 +2396,7 @@ diff -urN --no-dereference binutils-clean/opcodes/xr17032-dis.c binutils-workdir
 diff -urN --no-dereference binutils-clean/opcodes/xr17032-opc.c binutils-workdir/opcodes/xr17032-opc.c
 --- binutils-clean/opcodes/xr17032-opc.c	1970-01-01 01:00:00.000000000 +0100
 +++ binutils-workdir/opcodes/xr17032-opc.c
-@@ -0,0 +1,232 @@
+@@ -0,0 +1,234 @@
 +/* xr17032-opc.c -- Table of opcodes for the XR/17032 processor.
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +   Contributed by monkuous
@@ -2406,6 +2445,7 @@ diff -urN --no-dereference binutils-clean/opcodes/xr17032-opc.c binutils-workdir
 +#define OPC_MOVLLI	0x0000002b
 +#define OPC_SLTI	0x0000002c
 +#define OPC_BLT		0x0000002d
++#define OPC_ADR		0x00000030
 +#define OPC_SYS		0x00000031
 +#define OPC_MOVSIIR	0x00000032
 +#define OPC_MOVLII	0x00000033
@@ -2468,6 +2508,7 @@ diff -urN --no-dereference binutils-clean/opcodes/xr17032-opc.c binutils-workdir
 +  {"andi", 	0,			OPC06, OPC_ANDI,  {regA, regB, imm16}},
 +  {"xori", 	0,			OPC06, OPC_XORI,  {regA, regB, imm16}},
 +  {"ori", 	0,			OPC06, OPC_ORI,	  {regA, regB, imm16}},
++  {"adr",	0,			OPC06, OPC_ADR,	  {regA, disp16_16}},
 +  {"lui", 	0,			OPC06, OPC_LUI,	  {regA, regB,
 +							   imm16_16}},
 +  {"jalr", 	0,			OPC06, OPC_JALR,  {regA, regB,
