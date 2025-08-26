@@ -1644,7 +1644,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +	(and:SI (match_operand:SI 1 "immediate_operand")
 +		(const_int 4294901760)))]
 +  ""
-+  "lui\t%0,%1")
++  "lui\t%0,zero,%1")
 +
 +(define_insn "xr17032_lli"
 +  [(set (match_operand:SI                  0 "register_operand")
@@ -1652,7 +1652,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +		 (and:SI (match_operand:SI 2 "immediate_operand")
 +			 (const_int 65535))))]
 +  ""
-+  "addi\t%0,%1,%2")
++  "ori\t%0,%1,%2")
 +  
 +(define_insn "*mov<mode>"
 +  [(set (match_operand:MEMORY 0 "nonimmediate_operand" "=r,r,r,r,m,m")
