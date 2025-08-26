@@ -163,7 +163,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032-protos.h gcc-wor
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/gcc/config/xr17032/xr17032.cc
 --- gcc-clean/gcc/config/xr17032/xr17032.cc	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.cc
-@@ -0,0 +1,1115 @@
+@@ -0,0 +1,1184 @@
 +/* Target Code for XR/17032
 +   Copyright (C) 2025-2025 Free Softwa*re Foundation, Inc.
 +   Contributed by monkuous.
@@ -1206,8 +1206,19 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +
 +  if (return_p)
 +    {
-+      // TODO: Low bits in high register
-+      return gen_rtx_REG (mode, gpr_base - info->gpr_offset);
++      if (num_words <= 1)
++	return gen_rtx_REG (mode, gpr_base - info->gpr_offset);
++
++      rtvec vec = rtvec_alloc (num_words);
++
++      for (unsigned i = 0; i < num_words; i++)
++	{
++	  rtx reg = gen_rtx_REG (SImode, gpr_base - info->gpr_offset - i);
++	  rtx off = gen_rtx_CONST_INT (SImode, i * UNITS_PER_WORD);
++	  RTVEC_ELT (vec, i) = gen_rtx_EXPR_LIST (SImode, reg, off);
++	}
++
++      return gen_rtx_PARALLEL (mode, vec);
 +    }
 +
 +  return gen_rtx_REG (mode, gpr_base + info->gpr_offset);
@@ -1253,6 +1264,55 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +    cum->variant_cc = XR17032_CC_BASE;
 +}
 +
++static rtx
++xr17032_function_value (const_tree type, const_tree func, bool)
++{
++  CUMULATIVE_ARGS cum;
++  struct xr17032_arg_info info;
++  machine_mode mode = TYPE_MODE (type);
++
++  memset (&cum, 0, sizeof (cum));
++
++  int unsigned_p = TYPE_UNSIGNED (type);
++  mode = promote_function_mode (type, mode, &unsigned_p, func, 1);
++
++  return xr17032_get_arg_info (&info, &cum, mode, type, true);
++}
++
++static rtx
++xr17032_libcall_value (machine_mode mode, const_rtx)
++{
++  CUMULATIVE_ARGS cum;
++  struct xr17032_arg_info info;
++
++  memset (&cum, 0, sizeof (cum));
++
++  return xr17032_get_arg_info (&info, &cum, mode, nullptr, true);
++}
++
++static bool
++xr17032_function_value_regno_p (const unsigned int regno)
++{
++  return regno >= XR17032_A0 && regno <= XR17032_A3;
++}
++
++static bool
++xr17032_return_in_memory (const_tree type, const_tree func)
++{
++  CUMULATIVE_ARGS cum;
++  struct xr17032_arg_info info;
++  machine_mode mode = TYPE_MODE (type);
++
++  memset (&cum, 0, sizeof (cum));
++
++  int unsigned_p = TYPE_UNSIGNED (type);
++  mode = promote_function_mode (type, mode, &unsigned_p, func, 1);
++
++  xr17032_get_arg_info (&info, &cum, mode, type, true);
++
++  return info.stack_p;
++}
++
 +#undef TARGET_OPTION_OVERRIDE
 +#define TARGET_OPTION_OVERRIDE xr17032_option_override
 +
@@ -1276,13 +1336,22 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +#undef TARGET_FUNCTION_ARG_BOUNDARY
 +#define TARGET_FUNCTION_ARG_BOUNDARY xr17032_function_arg_boundary
 +
++#undef TARGET_FUNCTION_VALUE
++#define TARGET_FUNCTION_VALUE xr17032_function_value
++#undef TARGET_LIBCALL_VALUE
++#define TARGET_LIBCALL_VALUE xr17032_libcall_value
++#undef TARGET_FUNCTION_VALUE_REGNO_P
++#define TARGET_FUNCTION_VALUE_REGNO_P xr17032_function_value_regno_p
++#undef TARGET_RETURN_IN_MEMORY
++#define TARGET_RETURN_IN_MEMORY xr17032_return_in_memory
++
 +struct gcc_target targetm = TARGET_INITIALIZER;
 +
 +#include "gt-xr17032.h"
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gcc/config/xr17032/xr17032.h
 --- gcc-clean/gcc/config/xr17032/xr17032.h	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.h
-@@ -0,0 +1,240 @@
+@@ -0,0 +1,241 @@
 +/* Target Definitions for XR/17032.
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +   Contributed by monkuous.
@@ -1491,6 +1560,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gc
 +#define RETURN_ADDR_RTX(COUNT, FRAMEADDR) xr17032_return_addr (COUNT)
 +#define INCOMING_RETURN_ADDR_RTX gen_rtx_REG (VOIDmode, XR17032_LR)
 +#define MAX_ARGS_IN_REGISTERS 4
++#define DEFAULT_PCC_STRUCT_RETURN 0
 +
 +#define DEFAULT_SIGNED_CHAR 0
 +
@@ -1526,7 +1596,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gc
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/gcc/config/xr17032/xr17032.md
 --- gcc-clean/gcc/config/xr17032/xr17032.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.md
-@@ -0,0 +1,203 @@
+@@ -0,0 +1,224 @@
 +;; Machine description for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -1730,6 +1800,27 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +  "@
 +   jalr\tlr,%0,0
 +   jal\t%0")
++
++(define_expand "call_value"
++  [(set (match_operand 0 "")
++        (call (match_operand 1 "")
++	      (match_operand 2 "")))]
++  ""
++{
++  rtx target = XEXP (operands[1], 0);
++  emit_call_insn (gen_xr17032_call_value (operands[0], target, operands[2]));
++  DONE;
++})
++
++(define_insn "xr17032_call_value"
++  [(set (match_operand 0 "" "")
++        (call (mem:SI (match_operand 1 "" "r,S"))
++	      (match_operand 2 "" "")))
++   (clobber (reg:SI 31))]
++  ""
++  "@
++   jalr\tlr,%1,0
++   jal\t%1")
 diff -urN --no-dereference gcc-clean/gcc/config.gcc gcc-workdir/gcc/config.gcc
 --- gcc-clean/gcc/config.gcc
 +++ gcc-workdir/gcc/config.gcc
