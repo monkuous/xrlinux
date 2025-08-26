@@ -1,7 +1,7 @@
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/constraints.md gcc-workdir/gcc/config/xr17032/constraints.md
 --- gcc-clean/gcc/config/xr17032/constraints.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/constraints.md
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,42 @@
 +;; Constraint definitions for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -34,17 +34,20 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/constraints.md gcc-workd
 +  (and (match_code "const_int")
 +       (match_test "SMALL_OPERAND_SIGNED (ival)")))
 +       
-+(define_constraint "K" "Unsigned 5-bit immediate"
++(define_constraint "K" "Signed 5-bit immediate"
 +  (and (match_code "const_int")
-+       (match_test "(unsigned HOST_WIDE_INT) (ival) < 32")))
++       (match_test "(unsigned HOST_WIDE_INT) (ival) + 16 < 32")))
 +
 +(define_constraint "a" "Register with potential shift"
 +  (match_operand 0 "xr17032_reg_shift_operand"))
-+  
++
++(define_constraint "S"
++  "A constraint that matches an absolute symbolic address."
++  (match_operand 0 "xr17032_absolute_symbolic_operand"))
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/predicates.md gcc-workdir/gcc/config/xr17032/predicates.md
 --- gcc-clean/gcc/config/xr17032/predicates.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/predicates.md
-@@ -0,0 +1,74 @@
+@@ -0,0 +1,77 @@
 +;; Predicate description for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -105,7 +108,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/predicates.md gcc-workdi
 +
 +(define_predicate "xr17032_tinyimm_operand"
 +  (and (match_code "const_int")
-+       (match_test "(unsigned HOST_WIDE_INT) (INTVAL (op)) < 32")))
++       (match_test "(unsigned HOST_WIDE_INT) INTVAL (op) + 16 < 32")))
 +
 +(define_predicate "xr17032_smallimm_operand"
 +  (and (match_code "const_int")
@@ -119,10 +122,13 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/predicates.md gcc-workdi
 +(define_predicate "xr17032_arith_operand"
 +  (ior (match_operand 0 "xr17032_reg_shift_operand")
 +       (match_operand 0 "xr17032_smallimm_operand")))
++
++(define_predicate "xr17032_absolute_symbolic_operand"
++  (match_code "const,symbol_ref,label_ref"))
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032-protos.h gcc-workdir/gcc/config/xr17032/xr17032-protos.h
 --- gcc-clean/gcc/config/xr17032/xr17032-protos.h	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032-protos.h
-@@ -0,0 +1,28 @@
+@@ -0,0 +1,31 @@
 +/* Prototypes for xr17032.cc functions used in the md file & elsewhere.
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +
@@ -149,12 +155,15 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032-protos.h gcc-wor
 +extern poly_int64 xr17032_initial_elimination_offset (int, int);
 +extern void xr17032_expand_prologue (void);
 +extern void xr17032_expand_epilogue (void);
++extern rtx xr17032_return_addr (int);
++extern void xr17032_init_cumulative_args (CUMULATIVE_ARGS *, tree, rtx, tree,
++					  int);
 +
 +#endif /* GCC_XR17032_PROTOS_H */
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/gcc/config/xr17032/xr17032.cc
 --- gcc-clean/gcc/config/xr17032/xr17032.cc	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.cc
-@@ -0,0 +1,974 @@
+@@ -0,0 +1,1115 @@
 +/* Target Code for XR/17032
 +   Copyright (C) 2025-2025 Free Softwa*re Foundation, Inc.
 +   Contributed by monkuous.
@@ -453,19 +462,18 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +
 +  /* At the bottom of the frame are any outgoing stack arguments. */
 +  offset = xr17032_stack_align (crtl->outgoing_args_size);
++  /* The frame pointer points to the local variables. */
++  frame->hard_frame_pointer_offset = offset;
++  frame->frame_pointer_offset = offset;
 +  /* Next are local stack variables. */
 +  offset += xr17032_stack_align (get_frame_size ());
-+  /* The virtual frame pointer points above the local variables. */
-+  frame->frame_pointer_offset = offset;
 +  /* Next are the callee-saved GPRs. */
 +  if (frame->mask)
 +    {
 +      offset += x_save_size;
 +    }
 +  frame->gp_sp_offset = offset - UNITS_PER_WORD;
-+  /* The hard frame pointer points above the callee-saved GPRs. */
-+  frame->hard_frame_pointer_offset = offset;
-+  /* Above the hard frame pointer is the callee-allocated varags save area. */
++  /* Above the saved GPRs is the callee-allocated varags save area. */
 +  offset += xr17032_stack_align (cfun->machine->varargs_size);
 +  /* Next is the callee-allocated area for pretend stack arguments.  */
 +  offset += xr17032_stack_align (crtl->args.pretend_args_size);
@@ -516,6 +524,9 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +  unsigned size = GET_MODE_SIZE (mode);
 +  unsigned single_size = size <= UNITS_PER_WORD ? size : UNITS_PER_WORD;
 +  unsigned single_mask = single_size - 1;
++
++  if (offset < 0)
++    return false;
 +
 +  if (offset & single_mask)
 +    return false;
@@ -853,6 +864,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +xr17032_restore_reg (rtx reg, rtx mem)
 +{
 +  rtx insn = xr17032_emit_move (reg, mem);
++  xr17032_set_frame_expr (xr17032_frame_set (reg, mem));
 +  rtx dwarf = NULL_RTX;
 +  dwarf = alloc_reg_note (REG_CFA_RESTORE, reg, dwarf);
 +
@@ -1038,7 +1050,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +xr17032_operand_error (const char *message, rtx x)
 +{
 +  debug_rtx (x);
-+  output_operand_lossage ("%s", message);
++  output_operand_lossage ("xr17032: %s", message);
 +}
 +
 +static void
@@ -1062,13 +1074,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +      output_address (GET_MODE (XEXP (x, 0)), XEXP (x, 0));
 +      return;
 +    default:
-+      if (CONSTANT_P (x))
-+	{
-+	  output_addr_const (file, x);
-+	  return;
-+	}
-+
-+      xr17032_operand_error ("unexpected operand", x);
++      output_addr_const (file, x);
 +      return;
 +    }
 +}
@@ -1115,6 +1121,138 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +    }
 +}
 +
++static bool
++xr17032_frame_pointer_required (void)
++{
++  return frame_pointer_needed;
++}
++
++rtx
++xr17032_return_addr (int count)
++{
++  return count ? const0_rtx : get_hard_reg_initial_val (Pmode, XR17032_LR);
++}
++
++struct xr17032_arg_info
++{
++  /* True if the argument is at least partially passed on the stack.  */
++  bool stack_p;
++
++  /* The number of integer registers allocated to this argument.  */
++  unsigned int num_gprs;
++
++  /* The offset of the first register used, provided num_gprs is nonzero.
++     If passed entirely on the stack, the value is MAX_ARGS_IN_REGISTERS.  */
++  unsigned int gpr_offset;
++};
++
++/* Implement TARGET_FUNCTION_ARG_BOUNDARY.  Every parameter gets at
++   least PARM_BOUNDARY bits of alignment, but will be given anything up
++   to PREFERRED_STACK_BOUNDARY bits if the type requires it.  */
++
++static unsigned int
++xr17032_function_arg_boundary (machine_mode mode, const_tree type)
++{
++  unsigned int alignment;
++
++  /* Use natural alignment if the type is not aggregate data.  */
++  if (type && !AGGREGATE_TYPE_P (type))
++    alignment = TYPE_ALIGN (TYPE_MAIN_VARIANT (type));
++  else
++    alignment = type ? TYPE_ALIGN (type) : GET_MODE_ALIGNMENT (mode);
++
++  return MIN (STACK_BOUNDARY, MAX (PARM_BOUNDARY, alignment));
++}
++
++typedef struct {
++  const_tree type;
++  HOST_WIDE_INT offset;
++} xr17032_aggregate_field;
++
++/* Fill INFO with information about a single argument, and return an RTL
++   pattern to pass or return the argument. Return NULL_RTX if argument cannot
++   pass or return in registers, then the argument may be passed by reference or
++   through the stack or  .  CUM is the cumulative state for earlier arguments.
++   MODE is the mode of this argument and TYPE is its type (if known). NAMED is
++   true if this is a named (fixed) argument rather than a variable one. RETURN_P
++   is true if returning the argument, or false if passing the argument.  */
++
++static rtx
++xr17032_get_arg_info (struct xr17032_arg_info *info, const CUMULATIVE_ARGS *cum,
++		      machine_mode mode, const_tree type, bool return_p)
++{
++  unsigned num_bytes, num_words;
++  unsigned gpr_base = return_p ? XR17032_A3 : XR17032_A0;
++
++  memset (info, 0, sizeof (*info));
++  info->gpr_offset = cum->num_gprs;
++
++  /* Work out the size of the argument.  */
++  num_bytes = type ? int_size_in_bytes (type) : GET_MODE_SIZE (mode);
++  num_words = (num_bytes + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
++
++  if (!return_p && num_words > 2)
++    info->stack_p = true;
++  else
++    info->stack_p = num_words > MAX_ARGS_IN_REGISTERS - info->gpr_offset;
++
++  if (info->stack_p)
++    {
++      info->num_gprs = 0;
++      return NULL_RTX;
++    }
++
++  info->num_gprs = num_words;
++
++  if (return_p)
++    {
++      // TODO: Low bits in high register
++      return gen_rtx_REG (mode, gpr_base - info->gpr_offset);
++    }
++
++  return gen_rtx_REG (mode, gpr_base + info->gpr_offset);
++}
++
++static rtx
++xr17032_function_arg (cumulative_args_t cum_v, const function_arg_info &arg)
++{
++  CUMULATIVE_ARGS *cum = get_cumulative_args (cum_v);
++  struct xr17032_arg_info info;
++
++  if (arg.end_marker_p ())
++    /* Return the calling convention that used by the current function. */
++    return gen_int_mode (cum->variant_cc, SImode);
++
++  return xr17032_get_arg_info (&info, cum, arg.mode, arg.type, false);
++}
++
++static void
++xr17032_function_arg_advance (cumulative_args_t cum_v,
++			      const function_arg_info &arg)
++{
++  CUMULATIVE_ARGS *cum = get_cumulative_args (cum_v);
++  struct xr17032_arg_info info;
++
++  xr17032_get_arg_info (&info, cum, arg.mode, arg.type, false);
++
++  cum->num_gprs = info.gpr_offset + info.num_gprs;
++}
++
++/* Initialize a variable CUM of type CUMULATIVE_ARGS
++   for a call to a function whose data type is FNTYPE.
++   For a library call, FNTYPE is 0.  */
++
++void
++xr17032_init_cumulative_args (CUMULATIVE_ARGS *cum, tree fntype, rtx, tree, int)
++{
++  memset (cum, 0, sizeof (*cum));
++
++  if (fntype)
++    cum->variant_cc = (xr17032_cc) fntype_abi (fntype).id ();
++  else
++    cum->variant_cc = XR17032_CC_BASE;
++}
++
 +#undef TARGET_OPTION_OVERRIDE
 +#define TARGET_OPTION_OVERRIDE xr17032_option_override
 +
@@ -1126,13 +1264,25 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +#undef TARGET_PRINT_OPERAND_ADDRESS
 +#define TARGET_PRINT_OPERAND_ADDRESS xr17032_print_operand_address
 +
++#undef TARGET_FRAME_POINTER_REQUIRED
++#define TARGET_FRAME_POINTER_REQUIRED xr17032_frame_pointer_required
++
++#undef TARGET_MUST_PASS_IN_STACK
++#define TARGET_MUST_PASS_IN_STACK must_pass_in_stack_var_size
++#undef TARGET_FUNCTION_ARG
++#define TARGET_FUNCTION_ARG xr17032_function_arg
++#undef TARGET_FUNCTION_ARG_ADVANCE
++#define TARGET_FUNCTION_ARG_ADVANCE xr17032_function_arg_advance
++#undef TARGET_FUNCTION_ARG_BOUNDARY
++#define TARGET_FUNCTION_ARG_BOUNDARY xr17032_function_arg_boundary
++
 +struct gcc_target targetm = TARGET_INITIALIZER;
 +
 +#include "gt-xr17032.h"
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gcc/config/xr17032/xr17032.h
 --- gcc-clean/gcc/config/xr17032/xr17032.h	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.h
-@@ -0,0 +1,216 @@
+@@ -0,0 +1,240 @@
 +/* Target Definitions for XR/17032.
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +   Contributed by monkuous.
@@ -1221,9 +1371,6 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gc
 +  { FRAME_POINTER_REGNUM, STACK_POINTER_REGNUM },	\
 +  { FRAME_POINTER_REGNUM, HARD_FRAME_POINTER_REGNUM } }
 +
-+#define INIT_CUMULATIVE_ARGS(CUM,FNTYPE,LIBNAME,FNDECL,N_NAMED_ARGS) \
-+  (CUM = XR17032_A0)
-+
 +enum reg_class
 +{
 +  NO_REGS,
@@ -1277,8 +1424,6 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gc
 +
 +#define UNITS_PER_WORD 4
 +
-+#define CUMULATIVE_ARGS unsigned int
-+
 +#define MOVE_MAX 4
 +
 +#define Pmode SImode
@@ -1318,6 +1463,35 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gc
 +#define STACK_DYNAMIC_OFFSET(FUNDECL) \
 +  (crtl->outgoing_args_size + STACK_POINTER_OFFSET)
 +
++/* Define the standard XR/17032 calling convention and variants.  */
++
++enum xr17032_cc
++{
++  XR17032_CC_BASE = 0, /* Base standard XR/17032 ABI.  */
++  XR17032_CC_UNKNOWN
++};
++
++typedef struct {
++  /* The calling convention that current function used.  */
++  enum xr17032_cc variant_cc;
++
++  /* Number of integer registers used so far, up to MAX_ARGS_IN_REGISTERS. */
++  unsigned int num_gprs;
++} CUMULATIVE_ARGS;
++
++/* Initialize a variable CUM of type CUMULATIVE_ARGS
++   for a call to a function whose data type is FNTYPE.
++   For a library call, FNTYPE is 0.  */
++
++#define INIT_CUMULATIVE_ARGS(CUM, FNTYPE, LIBNAME, INDIRECT, N_NAMED_ARGS) \
++  xr17032_init_cumulative_args (&(CUM), (FNTYPE), (LIBNAME), (INDIRECT),   \
++			(N_NAMED_ARGS) != -1)
++
++#define ACCUMULATE_OUTGOING_ARGS 1
++#define RETURN_ADDR_RTX(COUNT, FRAMEADDR) xr17032_return_addr (COUNT)
++#define INCOMING_RETURN_ADDR_RTX gen_rtx_REG (VOIDmode, XR17032_LR)
++#define MAX_ARGS_IN_REGISTERS 4
++
 +#define DEFAULT_SIGNED_CHAR 0
 +
 +#define GLOBAL_ASM_OP 			"\t.globl\t"
@@ -1352,7 +1526,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gc
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/gcc/config/xr17032/xr17032.md
 --- gcc-clean/gcc/config/xr17032/xr17032.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.md
-@@ -0,0 +1,161 @@
+@@ -0,0 +1,203 @@
 +;; Machine description for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -1406,9 +1580,10 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +})
 +
 +(define_insn "xr17032_return"
-+  [(return)]
++  [(return)
++   (use (reg:SI 31))]
 +  "reload_completed"
-+  "jalr\\tzero,lr,0")
++  "jalr\tzero,lr,0")
 +
 +(define_insn "xr17032_stack_tiesi"
 +  [(set (mem:BLK (scratch))
@@ -1427,7 +1602,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +(define_insn "nop"
 +  [(const_int 0)]
 +  ""
-+  "addi\\tzero,zero,0")
++  "addi\tzero,zero,0")
 +
 +;; -------------------------------------------------------------------------
 +;; mov instruction
@@ -1449,10 +1624,18 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +	  reg = gen_reg_rtx (<MODE>mode);
 +	}
 +      emit_insn (gen_xr17032_lui (reg, operands[1]));
-+      emit_insn (gen_xr17032_lli (reg, operands[1]));
-+      if (register_operand (operands[0], <MODE>mode))
-+	DONE;
++      emit_insn (gen_xr17032_lli (reg, reg, operands[1]));
++      if (!register_operand (operands[0], <MODE>mode))
++	emit_move_insn (operands[0], reg);
++      DONE;
++    }
++  else if (MEM_P (operands[0]) && MEM_P (operands[1]))
++    {
++      gcc_assert (! (reload_in_progress || reload_completed));
++      rtx reg = gen_reg_rtx (<MODE>mode);
++      emit_move_insn (reg, operands[1]);
 +      emit_move_insn (operands[0], reg);
++      DONE;
 +    }
 +})
 +
@@ -1461,15 +1644,15 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +	(and:SI (match_operand:SI 1 "immediate_operand")
 +		(const_int 4294901760)))]
 +  ""
-+  "lui\\t%0,%1")
++  "lui\t%0,%1")
 +
 +(define_insn "xr17032_lli"
 +  [(set (match_operand:SI                  0 "register_operand")
-+	(plus:SI (match_dup                0)
-+		 (and:SI (match_operand:SI 1 "immediate_operand")
++	(plus:SI (match_operand:SI         1 "register_operand")
++		 (and:SI (match_operand:SI 2 "immediate_operand")
 +			 (const_int 65535))))]
 +  ""
-+  "addi\\t%0,%0,%1")
++  "addi\t%0,%1,%2")
 +  
 +(define_insn "*mov<mode>"
 +  [(set (match_operand:MEMORY 0 "nonimmediate_operand" "=r,r,r,r,m,m")
@@ -1478,12 +1661,12 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +    || register_operand (operands[1], <MODE>mode)
 +    || xr17032_tinyimm_operand (operands[1], <MODE>mode)"
 +  "@
-+   add\\t%0,%1,zero
-+   add\\t%0,zero,zero
-+   addi\\t%0,zero,%1
-+   mov\\t%0,%1
-+   mov\\t%0,zero
-+   mov\\t%0,%1")
++   add\t%0,%1,zero
++   add\t%0,zero,zero
++   addi\t%0,zero,%1
++   mov\t%0,%1
++   mov\t%0,zero
++   mov\t%0,%1")
 +
 +;; -------------------------------------------------------------------------
 +;; add instruction
@@ -1495,10 +1678,10 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +		 (match_operand:SI 2 "xr17032_arith_operand"    " a,I,a,I")))]
 +  ""
 +  "@
-+   add\\t%0,%1,%2
-+   addi\\t%0,%1,%2
-+   add\\t%0,zero,%2
-+   addi\\t%0,zero,%2")
++   add\t%0,%1,%2
++   addi\t%0,%1,%2
++   add\t%0,zero,%2
++   addi\t%0,zero,%2")
 +   
 +;; -------------------------------------------------------------------------
 +;; sub instruction
@@ -1510,10 +1693,43 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +		  (match_operand:SI 2 "xr17032_arith_operand"    " a,I,a,I")))]
 +  ""
 +  "@
-+   sub\\t%0,%1,%2
-+   subi\\t%0,%1,%2
-+   sub\\t%0,zero,%2
-+   subi\\t%0,zero,%2")
++   sub\t%0,%1,%2
++   subi\t%0,%1,%2
++   sub\t%0,zero,%2
++   subi\t%0,zero,%2")
++
++;; -------------------------------------------------------------------------
++;; j instruction
++;; -------------------------------------------------------------------------
++
++(define_insn "jump"
++  [(set (pc)
++	(label_ref (match_operand 0 "" "")))]
++  ""
++  "j\t%0")
++
++;; -------------------------------------------------------------------------
++;; jal instruction
++;; -------------------------------------------------------------------------
++
++(define_expand "call"
++  [(call (match_operand 0 "")
++	 (match_operand 1 ""))]
++  ""
++{
++  rtx target = XEXP (operands[0], 0);
++  emit_call_insn (gen_xr17032_call (target, operands[1]));
++  DONE;
++})
++
++(define_insn "xr17032_call"
++  [(call (mem:SI (match_operand 0 "" "r,S"))
++	 (match_operand 1 "" ""))
++   (clobber (reg:SI 31))]
++  ""
++  "@
++   jalr\tlr,%0,0
++   jal\t%0")
 diff -urN --no-dereference gcc-clean/gcc/config.gcc gcc-workdir/gcc/config.gcc
 --- gcc-clean/gcc/config.gcc
 +++ gcc-workdir/gcc/config.gcc
