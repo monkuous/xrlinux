@@ -1,7 +1,7 @@
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/constraints.md gcc-workdir/gcc/config/xr17032/constraints.md
 --- gcc-clean/gcc/config/xr17032/constraints.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/constraints.md
-@@ -0,0 +1,50 @@
+@@ -0,0 +1,55 @@
 +;; Constraint definitions for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -52,10 +52,15 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/constraints.md gcc-workd
 +(define_constraint "S"
 +  "A constraint that matches an absolute symbolic address."
 +  (match_operand 0 "xr17032_absolute_symbolic_operand"))
++
++(define_constraint "R"
++  "A constraint that matches a PC-relative symbolic address."
++  (match_operand 0 "xr17032_pcrel_symbolic_operand"))
++  
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/predicates.md gcc-workdir/gcc/config/xr17032/predicates.md
 --- gcc-clean/gcc/config/xr17032/predicates.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/predicates.md
-@@ -0,0 +1,90 @@
+@@ -0,0 +1,103 @@
 +;; Predicate description for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -132,7 +137,20 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/predicates.md gcc-workdi
 +       (match_operand 0 "xr17032_smallimm_operand")))
 +
 +(define_predicate "xr17032_absolute_symbolic_operand"
-+  (match_code "const,symbol_ref,label_ref"))
++  (match_code "const,symbol_ref,label_ref")
++{
++  enum xr17032_symbol_type type;
++  return (xr17032_symbolic_constant_p (op, &type)
++	  && (type == XR17032_SYMBOL_ABSOLUTE));
++})
++  
++(define_predicate "xr17032_pcrel_symbolic_operand"
++  (match_code "const,symbol_ref,label_ref")
++{
++  enum xr17032_symbol_type type;
++  return (xr17032_symbolic_constant_p (op, &type)
++	  && (type == XR17032_SYMBOL_PCREL));
++})
 +
 +(define_predicate "xr17032_slt_operator"
 +  (match_code "lt,ltu"))
@@ -149,7 +167,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/predicates.md gcc-workdi
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032-protos.h gcc-workdir/gcc/config/xr17032/xr17032-protos.h
 --- gcc-clean/gcc/config/xr17032/xr17032-protos.h	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032-protos.h
-@@ -0,0 +1,31 @@
+@@ -0,0 +1,38 @@
 +/* Prototypes for xr17032.cc functions used in the md file & elsewhere.
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +
@@ -172,6 +190,12 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032-protos.h gcc-wor
 +#ifndef GCC_XR17032_PROTOS_H
 +#define GCC_XR17032_PROTOS_H
 +
++enum xr17032_symbol_type
++{
++  XR17032_SYMBOL_ABSOLUTE,
++  XR17032_SYMBOL_PCREL,
++};
++
 +extern int xr17032_regno_ok_for_base_p (int, bool);
 +extern poly_int64 xr17032_initial_elimination_offset (int, int);
 +extern void xr17032_expand_prologue (void);
@@ -179,12 +203,13 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032-protos.h gcc-wor
 +extern rtx xr17032_return_addr (int);
 +extern void xr17032_init_cumulative_args (CUMULATIVE_ARGS *, tree, rtx, tree,
 +					  int);
++extern bool xr17032_symbolic_constant_p (rtx, enum xr17032_symbol_type *);
 +
 +#endif /* GCC_XR17032_PROTOS_H */
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/gcc/config/xr17032/xr17032.cc
 --- gcc-clean/gcc/config/xr17032/xr17032.cc	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.cc
-@@ -0,0 +1,1184 @@
+@@ -0,0 +1,1223 @@
 +/* Target Code for XR/17032
 +   Copyright (C) 2025-2025 Free Softwa*re Foundation, Inc.
 +   Contributed by monkuous.
@@ -1334,6 +1359,45 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +  return info.stack_p;
 +}
 +
++/* Return the method that should be used to access SYMBOL_REF or
++   LABEL_REF X.  */
++
++static enum xr17032_symbol_type
++xr17032_classify_symbol (const_rtx x ATTRIBUTE_UNUSED)
++{
++  return flag_pic ? XR17032_SYMBOL_PCREL : XR17032_SYMBOL_ABSOLUTE;
++}
++
++/* Return true if X is a symbolic constant.  If it is, store the type of
++   the symbol in *SYMBOL_TYPE.  */
++
++bool
++xr17032_symbolic_constant_p (rtx x, enum xr17032_symbol_type *symbol_type)
++{
++  rtx offset;
++
++  split_const (x, &x, &offset);
++  if (GET_CODE (x) == SYMBOL_REF || GET_CODE (x) == LABEL_REF)
++    *symbol_type = xr17032_classify_symbol (x);
++  else
++    return false;
++
++  if (offset == const0_rtx)
++    return true;
++
++  /* Nonzero offsets are only valid for references that don't use the GOT.  */
++  switch (*symbol_type)
++    {
++    case XR17032_SYMBOL_ABSOLUTE:
++    case XR17032_SYMBOL_PCREL:
++      /* GAS rejects offsets outside the range [-2^31, 2^31-1].  */
++      return sext_hwi (INTVAL (offset), 32) == INTVAL (offset);
++
++    default:
++      return false;
++    }
++}
++
 +#undef TARGET_OPTION_OVERRIDE
 +#define TARGET_OPTION_OVERRIDE xr17032_option_override
 +
@@ -1719,10 +1783,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +      if (CONST_INT_P (operands[1]) && (INTVAL (operands[1]) & 0xffffffff) == 0xffffffff)
 +	emit_insn (gen_xorsi3 (reg, CONST0_RTX (SImode), operands[1]));
 +      else
-+	{
-+	  emit_insn (gen_xr17032_lui (reg, operands[1]));
-+	  emit_insn (gen_xr17032_lli (reg, reg, operands[1]));
-+	}
++	emit_insn (gen_xr17032_const32 (reg, operands[1]));
 +      if (!register_operand (operands[0], <MODE>mode))
 +	emit_move_insn (operands[0], reg);
 +      DONE;
@@ -1737,20 +1798,15 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +    }
 +})
 +
-+(define_insn "xr17032_lui"
-+  [(set (match_operand:SI         0 "register_operand")
-+	(and:SI (match_operand:SI 1 "immediate_operand")
-+		(const_int 4294901760)))]
++(define_insn "xr17032_const32"
++  [(set (match_operand:SI 0 "register_operand"  "")
++	(match_operand:SI 1 "immediate_operand" "nS,R"))]
 +  ""
-+  "lui\t%0,zero,%1")
-+
-+(define_insn "xr17032_lli"
-+  [(set (match_operand:SI                  0 "register_operand")
-+	(plus:SI (match_operand:SI         1 "register_operand")
-+		 (and:SI (match_operand:SI 2 "immediate_operand")
-+			 (const_int 65535))))]
-+  ""
-+  "ori\t%0,%1,%2")
++  "@
++   lui\t%0,zero,%1\;ori\t%0,%0,%1
++   adr\t%0,%1\;addi\t%0,%0,%%pcrel(%1+4)"
++  [(set (attr "length")
++	(const_int 8))])
 +  
 +(define_insn "*mov<mode>"
 +  [(set (match_operand:MEMORY 0 "nonimmediate_operand" "=r,r,r,r,m,m")
@@ -1997,13 +2053,17 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +})
 +
 +(define_insn "xr17032_call"
-+  [(call (mem:SI (match_operand 0 "" "r,S"))
++  [(call (mem:SI (match_operand 0 "" "r,S,R"))
 +	 (match_operand 1 "" ""))
 +   (clobber (reg:SI 31))]
 +  ""
 +  "@
 +   jalr\tlr,%0,0
-+   jal\t%0")
++   jal\t%0
++   adr\tlr,%0\;jalr\tlr,lr,%%pcrel(%0+4)"
++  [(set (attr "length")
++	(symbol_ref "xr17032_pcrel_symbolic_operand (operands[1], VOIDmode) ? 8
++		     : 4"))])
 +
 +(define_expand "call_value"
 +  [(set (match_operand 0 "")
@@ -2018,13 +2078,17 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +
 +(define_insn "xr17032_call_value"
 +  [(set (match_operand 0 "" "")
-+        (call (mem:SI (match_operand 1 "" "r,S"))
++        (call (mem:SI (match_operand 1 "" "r,S,R"))
 +	      (match_operand 2 "" "")))
 +   (clobber (reg:SI 31))]
 +  ""
 +  "@
 +   jalr\tlr,%1,0
-+   jal\t%1")
++   jal\t%1
++   adr\tlr,%1\;jalr\tlr,lr,%%pcrel(%1+4)"
++  [(set (attr "length")
++	(symbol_ref "xr17032_pcrel_symbolic_operand (operands[1], VOIDmode) ? 8
++		     : 4"))])
 +
 +;; -------------------------------------------------------------------------
 +;; conditionals
