@@ -2261,7 +2261,7 @@ diff -urN --no-dereference binutils-clean/opcodes/xr17032-dis.c binutils-workdir
 +    }
 +    case imm16_2:
 +    {
-+      unsigned int value = bits & 0x0003fffc;
++      unsigned int value = (bits >> 14) & 0x0003fffc;
 +      info->fprintf_func (info->stream, "%c0x%x", prefix, value);
 +      break;
 +    }
