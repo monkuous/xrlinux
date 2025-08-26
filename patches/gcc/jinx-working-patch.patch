@@ -1,7 +1,7 @@
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/constraints.md gcc-workdir/gcc/config/xr17032/constraints.md
 --- gcc-clean/gcc/config/xr17032/constraints.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/constraints.md
-@@ -0,0 +1,55 @@
+@@ -0,0 +1,54 @@
 +;; Constraint definitions for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -56,7 +56,6 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/constraints.md gcc-workd
 +(define_constraint "R"
 +  "A constraint that matches a PC-relative symbolic address."
 +  (match_operand 0 "xr17032_pcrel_symbolic_operand"))
-+  
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/predicates.md gcc-workdir/gcc/config/xr17032/predicates.md
 --- gcc-clean/gcc/config/xr17032/predicates.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/predicates.md
@@ -209,7 +208,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032-protos.h gcc-wor
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/gcc/config/xr17032/xr17032.cc
 --- gcc-clean/gcc/config/xr17032/xr17032.cc	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.cc
-@@ -0,0 +1,1223 @@
+@@ -0,0 +1,1206 @@
 +/* Target Code for XR/17032
 +   Copyright (C) 2025-2025 Free Softwa*re Foundation, Inc.
 +   Contributed by monkuous.
@@ -1145,26 +1144,9 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +static void
 +xr17032_print_operand_address (FILE *file, machine_mode mode, rtx x)
 +{
-+  switch (GET_CODE (x))
-+    {
-+    case REG:
-+      fprintf (file, "%s [%s]", xr17032_mode_id (mode), reg_names[REGNO (x)]);
-+      break;
-+    case PLUS: {
-+      rtx base = XEXP (x, 0);
-+      rtx offs = XEXP (x, 1);
-+
-+      fprintf (file, "%s [%s + ", xr17032_mode_id (mode),
-+	       reg_names[REGNO (base)]);
-+      xr17032_print_operand (file, offs, 0);
-+      fprintf (file, "]");
-+      break;
-+    }
-+    default:
-+      xr17032_operand_error ("todo address", x);
-+      output_addr_const (file, x);
-+      break;
-+    }
++  fprintf (file, "%s [", xr17032_mode_id (mode));
++  xr17032_print_operand (file, x, 0);
++  fprintf (file, "]");
 +}
 +
 +static bool
@@ -1807,9 +1789,9 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +   adr\t%0,%1\;addi\t%0,%0,%%pcrel(%1+4)"
 +  [(set (attr "length")
 +	(const_int 8))])
-+  
++
 +(define_insn "*mov<mode>"
-+  [(set (match_operand:MEMORY 0 "nonimmediate_operand" "=r,r,r,r,m,m")
++  [(set (match_operand:MEMORY 0 "nonimmediate_operand" "=r,r,r,r,m, m")
 +        (match_operand:MEMORY 1 "xr17032_move_operand" " r,O,I,m,O,rK"))]
 +  "register_operand (operands[0], <MODE>mode)
 +    || register_operand (operands[1], <MODE>mode)
