@@ -47,7 +47,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/constraints.md gcc-workd
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/predicates.md gcc-workdir/gcc/config/xr17032/predicates.md
 --- gcc-clean/gcc/config/xr17032/predicates.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/predicates.md
-@@ -0,0 +1,77 @@
+@@ -0,0 +1,80 @@
 +;; Predicate description for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -125,6 +125,9 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/predicates.md gcc-workdi
 +
 +(define_predicate "xr17032_absolute_symbolic_operand"
 +  (match_code "const,symbol_ref,label_ref"))
++
++(define_predicate "xr17032_slt_operator"
++  (match_code "lt,ltu"))
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032-protos.h gcc-workdir/gcc/config/xr17032/xr17032-protos.h
 --- gcc-clean/gcc/config/xr17032/xr17032-protos.h	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032-protos.h
@@ -1596,7 +1599,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gc
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/gcc/config/xr17032/xr17032.md
 --- gcc-clean/gcc/config/xr17032/xr17032.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.md
-@@ -0,0 +1,286 @@
+@@ -0,0 +1,299 @@
 +;; Machine description for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -1828,18 +1831,31 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +
 +(define_code_iterator cond [eq ne lt gt ge le])
 +
-+(define_insn "xr17032_slt"
-+  [(set (match_operand                    0 "register_operand"         "=r,r,r,r")
-+        (if_then_else (ltu (match_operand 1 "xr17032_reg_or_0_operand" " r,r,O,O")
-+			   (match_operand 2 "xr17032_arith_operand"    " a,I,a,I"))
++(define_code_iterator ltcond [ltu lt])
++(define_code_attr asm_ltcond [(ltu "") (lt " signed")])
++
++(define_expand "cstoresi4"
++  [(set (match_operand:SI                  0 "register_operand")
++	(if_then_else (match_operator      1 "xr17032_slt_operator"
++			[(match_operand:SI 2 "xr17032_reg_or_0_operand")
++			 (match_operand:SI 3 "xr17032_arith_operand")])
++		      (const_int 1)
++		      (const_int 0)))]
++  ""
++  "")
++
++(define_insn "xr17032_s<code>"
++  [(set (match_operand:SI                       0 "register_operand"         "=r,r,r,r")
++        (if_then_else (ltcond (match_operand:SI 1 "xr17032_reg_or_0_operand" " r,r,O,O")
++			      (match_operand:SI 2 "xr17032_arith_operand"    " a,I,a,I"))
 +		      (const_int 1)
 +		      (const_int 0)))]
 +  ""
 +  "@
-+   slt\t%0,%1,%2
-+   slti\t%0,%1,%2
-+   slt\t%0,zero,%2
-+   slti\t%0,%1,%2")
++   slt<asm_ltcond>\t%0,%1,%2
++   slti<asm_ltcond>\t%0,%1,%2
++   slt<asm_ltcond>\t%0,zero,%2
++   slti<asm_ltcond>\t%0,zero,%2")
 +
 +(define_expand "cbranchsi4"
 +  [(set (pc)
@@ -1856,9 +1872,9 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +    {
 +      rtx reg = gen_reg_rtx (SImode);
 +      if (code == LTU || code == GEU)
-+	emit_insn (gen_xr17032_slt (reg, operands[1], operands[2]));
++	emit_insn (gen_xr17032_sltu (reg, operands[1], operands[2]));
 +      else
-+	emit_insn (gen_xr17032_slt (reg, operands[2], operands[1]));
++	emit_insn (gen_xr17032_sltu (reg, operands[2], operands[1]));
 +      PUT_CODE (operands[0], code == LTU || code == GTU ? NE : EQ);
 +      operands[1] = reg;
 +      operands[2] = CONST0_RTX (SImode);
