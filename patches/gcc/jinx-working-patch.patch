@@ -1596,7 +1596,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gc
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/gcc/config/xr17032/xr17032.md
 --- gcc-clean/gcc/config/xr17032/xr17032.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.md
-@@ -0,0 +1,224 @@
+@@ -0,0 +1,286 @@
 +;; Machine description for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -1821,6 +1821,68 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +  "@
 +   jalr\tlr,%1,0
 +   jal\t%1")
++
++;; -------------------------------------------------------------------------
++;; conditionals
++;; -------------------------------------------------------------------------
++
++(define_code_iterator cond [eq ne lt gt ge le])
++
++(define_insn "xr17032_slt"
++  [(set (match_operand                    0 "register_operand"         "=r,r,r,r")
++        (if_then_else (ltu (match_operand 1 "xr17032_reg_or_0_operand" " r,r,O,O")
++			   (match_operand 2 "xr17032_arith_operand"    " a,I,a,I"))
++		      (const_int 1)
++		      (const_int 0)))]
++  ""
++  "@
++   slt\t%0,%1,%2
++   slti\t%0,%1,%2
++   slt\t%0,zero,%2
++   slti\t%0,%1,%2")
++
++(define_expand "cbranchsi4"
++  [(set (pc)
++	(if_then_else (match_operator 0 "ordered_comparison_operator"
++			[(match_operand:SI 1 "xr17032_reg_or_0_operand")
++			 (match_operand:SI 2 "xr17032_arith_operand")])
++		      (label_ref (match_operand 3 ""))
++		      (pc)))]
++  ""
++{
++  int code = GET_CODE (operands[0]);
++  
++  if (code == LTU || code == GTU || code == LEU || code == GEU)
++    {
++      rtx reg = gen_reg_rtx (SImode);
++      if (code == LTU || code == GEU)
++	emit_insn (gen_xr17032_slt (reg, operands[1], operands[2]));
++      else
++	emit_insn (gen_xr17032_slt (reg, operands[2], operands[1]));
++      PUT_CODE (operands[0], code == LTU || code == GTU ? NE : EQ);
++      operands[1] = reg;
++      operands[2] = CONST0_RTX (SImode);
++    }
++  else if (!CONST_INT_P (operands[2]) || INTVAL (operands[2]) != 0)
++    {
++      rtx reg = gen_reg_rtx (SImode);
++      emit_insn (gen_subsi3 (reg, operands[1], operands[2]));
++      operands[1] = reg;
++      operands[2] = CONST0_RTX (SImode);
++    }
++})
++
++(define_insn "*b<code>"
++  [(set (pc)
++        (if_then_else (cond (match_operand:SI 0 "xr17032_reg_or_0_operand" "O,r")
++			    (const_int 0))
++		      (label_ref (match_operand 1 ""))
++		      (pc)))]
++  ""
++  "@
++   b<code>\tzero,%1
++   b<code>\t%0,%1")
++  
 diff -urN --no-dereference gcc-clean/gcc/config.gcc gcc-workdir/gcc/config.gcc
 --- gcc-clean/gcc/config.gcc
 +++ gcc-workdir/gcc/config.gcc
