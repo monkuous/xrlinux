@@ -208,7 +208,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032-protos.h gcc-wor
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/gcc/config/xr17032/xr17032.cc
 --- gcc-clean/gcc/config/xr17032/xr17032.cc	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.cc
-@@ -0,0 +1,1231 @@
+@@ -0,0 +1,1275 @@
 +/* Target Code for XR/17032
 +   Copyright (C) 2025-2025 Free Softwa*re Foundation, Inc.
 +   Contributed by monkuous.
@@ -1405,6 +1405,46 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +    }
 +}
 +
++static void
++xr17032_setup_incoming_varargs (cumulative_args_t cum,
++			        const function_arg_info &arg,
++			        int *pretend_size ATTRIBUTE_UNUSED, int no_rtl)
++{
++  CUMULATIVE_ARGS local_cum;
++  int gp_saved;
++
++  /* The caller has advanced CUM up to, but not beyond, the last named
++     argument.  Advance a local copy of CUM past the last "real" named
++     argument, to find out how many registers are left over.  */
++  local_cum = *get_cumulative_args (cum);
++  if (!TYPE_NO_NAMED_ARGS_STDARG_P (TREE_TYPE (current_function_decl))
++      || arg.type != NULL_TREE)
++    xr17032_function_arg_advance (pack_cumulative_args (&local_cum), arg);
++
++  /* Found out how many registers we need to save.  */
++  gp_saved = MAX_ARGS_IN_REGISTERS - local_cum.num_gprs;
++
++  if (!no_rtl && gp_saved > 0)
++    {
++      rtx ptr = plus_constant (Pmode, virtual_incoming_args_rtx,
++			       -gp_saved * UNITS_PER_WORD);
++      rtx mem = gen_frame_mem (BLKmode, ptr);
++      set_mem_alias_set (mem, get_varargs_alias_set ());
++
++      move_block_from_reg (local_cum.num_gprs + XR17032_A0,
++			   mem, gp_saved);
++    }
++
++  cfun->machine->varargs_size = gp_saved * UNITS_PER_WORD;
++}
++
++static void
++xr17032_expand_builtin_va_start (tree valist, rtx nextarg)
++{
++  nextarg = gen_rtx_MINUS (Pmode, nextarg, GEN_INT (cfun->machine->varargs_size));
++  std_expand_builtin_va_start (valist, nextarg);
++}
++
 +#undef TARGET_OPTION_OVERRIDE
 +#define TARGET_OPTION_OVERRIDE xr17032_option_override
 +
@@ -1419,6 +1459,10 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +#undef TARGET_FRAME_POINTER_REQUIRED
 +#define TARGET_FRAME_POINTER_REQUIRED xr17032_frame_pointer_required
 +
++#undef TARGET_SETUP_INCOMING_VARARGS
++#define TARGET_SETUP_INCOMING_VARARGS xr17032_setup_incoming_varargs
++#undef TARGET_EXPAND_BUILTIN_VA_START
++#define TARGET_EXPAND_BUILTIN_VA_START xr17032_expand_builtin_va_start
 +#undef TARGET_MUST_PASS_IN_STACK
 +#define TARGET_MUST_PASS_IN_STACK must_pass_in_stack_var_size
 +#undef TARGET_FUNCTION_ARG
