@@ -208,7 +208,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032-protos.h gcc-wor
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/gcc/config/xr17032/xr17032.cc
 --- gcc-clean/gcc/config/xr17032/xr17032.cc	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.cc
-@@ -0,0 +1,1206 @@
+@@ -0,0 +1,1231 @@
 +/* Target Code for XR/17032
 +   Copyright (C) 2025-2025 Free Softwa*re Foundation, Inc.
 +   Contributed by monkuous.
@@ -1116,7 +1116,32 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +      fprintf (file, "%s", reg_names[REGNO (x)]);
 +      return;
 +    case MEM:
-+      output_address (GET_MODE (XEXP (x, 0)), XEXP (x, 0));
++      output_address (GET_MODE (x), XEXP (x, 0));
++      return;
++    case PLUS:
++      xr17032_print_operand (file, XEXP (x, 0), code);
++      fputc ('+', file);
++      xr17032_print_operand (file, XEXP (x, 1), code);
++      return;
++    case ASHIFT:
++      xr17032_print_operand (file, XEXP (x, 0), code);
++      fputs (" LSH ", file);
++      xr17032_print_operand (file, XEXP (x, 1), code);
++      return;
++    case LSHIFTRT:
++      xr17032_print_operand (file, XEXP (x, 0), code);
++      fputs (" RSH ", file);
++      xr17032_print_operand (file, XEXP (x, 1), code);
++      return;
++    case ASHIFTRT:
++      xr17032_print_operand (file, XEXP (x, 0), code);
++      fputs (" ASH ", file);
++      xr17032_print_operand (file, XEXP (x, 1), code);
++      return;
++    case ROTATERT:
++      xr17032_print_operand (file, XEXP (x, 0), code);
++      fputs (" ROR ", file);
++      xr17032_print_operand (file, XEXP (x, 1), code);
 +      return;
 +    default:
 +      output_addr_const (file, x);
@@ -1665,7 +1690,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gc
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/gcc/config/xr17032/xr17032.md
 --- gcc-clean/gcc/config/xr17032/xr17032.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.md
-@@ -0,0 +1,488 @@
+@@ -0,0 +1,492 @@
 +;; Machine description for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -1781,7 +1806,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +})
 +
 +(define_insn "xr17032_const32"
-+  [(set (match_operand:SI 0 "register_operand"  "")
++  [(set (match_operand:SI 0 "register_operand"  "=r,r")
 +	(match_operand:SI 1 "immediate_operand" "nS,R"))]
 +  ""
 +  "@
@@ -2121,7 +2146,11 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +      if (code == LTU || code == GEU)
 +	emit_insn (gen_xr17032_sltu (reg, operands[1], operands[2]));
 +      else
-+	emit_insn (gen_xr17032_sltu (reg, operands[2], operands[1]));
++	{
++	  if (!xr17032_reg_shift_operand (operands[2], SImode))
++	    operands[2] = force_reg (SImode, operands[2]);
++	  emit_insn (gen_xr17032_sltu (reg, operands[2], operands[1]));
++	}
 +      PUT_CODE (operands[0], code == LTU || code == GTU ? NE : EQ);
 +      operands[1] = reg;
 +      operands[2] = CONST0_RTX (SImode);
@@ -2181,3 +2210,132 @@ diff -urN --no-dereference gcc-clean/gcc/config.gcc gcc-workdir/gcc/config.gcc
  xstormy16-*-elf)
  	# For historical reasons, the target files omit the 'x'.
  	tm_file="elfos.h newlib-stdint.h stormy16/stormy16.h"
+diff -urN --no-dereference gcc-clean/libgcc/config/xr17032/crti.S gcc-workdir/libgcc/config/xr17032/crti.S
+--- gcc-clean/libgcc/config/xr17032/crti.S	1970-01-01 01:00:00.000000000 +0100
++++ gcc-workdir/libgcc/config/xr17032/crti.S
+@@ -0,0 +1,51 @@
++# Start .init and .fini sections.
++# Copyright (C) 2025-2025 Free Software Foundation, Inc.
++#
++# This file is free software; you can redistribute it and/or modify it
++# under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3, or (at your option)
++# any later version.
++#
++# GCC is distributed in the hope that it will be useful, but WITHOUT ANY
++# WARRANTY; without even the implied warranty of MERCHANTABILITY or
++# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
++# for more details.
++#
++# Under Section 7 of GPL version 3, you are granted additional
++# permissions described in the GCC Runtime Library Exception, version
++# 3.1, as published by the Free Software Foundation.
++#
++# You should have received a copy of the GNU General Public License and
++# a copy of the GCC Runtime Library Exception along with this program;
++# see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
++# <http://www.gnu.org/licenses/>.
++
++# This file just makes a stack frame for the contents of the .fini and
++# .init sections.  Users may put any desired instructions in those
++# sections.
++
++/* An executable stack is *not* required for these functions.  */
++#if defined(__ELF__) && defined(__linux__)
++.section .note.GNU-stack,"",%progbits
++.previous
++#endif
++
++	.section .init
++	.globl _init
++	.type _init,@function
++	.align	4
++_init:
++	subi	sp,sp,8
++	mov	long [sp],s0
++	mov	long [sp+4],lr
++	addi	s0,sp,0
++
++	.section .fini
++	.globl _fini
++	.type _fini,@function
++	.align	4
++_fini:
++	subi	sp,sp,8
++	mov	long [sp],s0
++	mov	long [sp+4],lr
++	addi	s0,sp,0
+diff -urN --no-dereference gcc-clean/libgcc/config/xr17032/crtn.S gcc-workdir/libgcc/config/xr17032/crtn.S
+--- gcc-clean/libgcc/config/xr17032/crtn.S	1970-01-01 01:00:00.000000000 +0100
++++ gcc-workdir/libgcc/config/xr17032/crtn.S
+@@ -0,0 +1,44 @@
++# End of .init and .fini sections.
++# Copyright (C) 2025-2025 Free Software Foundation, Inc.
++#
++# This file is free software; you can redistribute it and/or modify it
++# under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3, or (at your option)
++# any later version.
++#
++# GCC is distributed in the hope that it will be useful, but WITHOUT ANY
++# WARRANTY; without even the implied warranty of MERCHANTABILITY or
++# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
++# for more details.
++#
++# Under Section 7 of GPL version 3, you are granted additional
++# permissions described in the GCC Runtime Library Exception, version
++# 3.1, as published by the Free Software Foundation.
++#
++# You should have received a copy of the GNU General Public License and
++# a copy of the GCC Runtime Library Exception along with this program;
++# see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
++# <http://www.gnu.org/licenses/>.
++
++
++# This file just makes sure that the .fini and .init sections do in
++# fact return.  Users may put any desired instructions in those sections.
++# This file is the last thing linked into any executable.
++
++/* An executable stack is *not* required for these functions.  */
++#if defined(__ELF__) && defined(__linux__)
++.section .note.GNU-stack,"",%progbits
++.previous
++#endif
++
++	.section .init
++	mov	s0,long [sp]
++	mov	lr,long [sp+4]
++	addi	sp,sp,8
++	jalr	zero,lr,0
++
++	.section .fini
++	mov	s0,long [sp]
++	mov	lr,long [sp+4]
++	addi	sp,sp,8
++	jalr	zero,lr,0
+diff -urN --no-dereference gcc-clean/libgcc/config.host gcc-workdir/libgcc/config.host
+--- gcc-clean/libgcc/config.host
++++ gcc-workdir/libgcc/config.host
+@@ -218,6 +218,9 @@
+ tic6x-*-*)
+ 	cpu_type=c6x
+ 	;;
++xr17032-*-*)
++	cpu_type=xr17032
++	;;
+ esac
+ 
+ # Common parts for widely ported systems.
+@@ -1543,6 +1546,12 @@
+         extra_parts="$extra_parts crtbegin.o crtend.o crti.o crtn.o"
+         tmake_file="visium/t-visium t-fdpbit"
+         ;;
++xr17032-*-elf)
++	extra_parts="$extra_parts crtbegin.o crti.o crtn.o crtend.o"
++	;;
++xr17032-*-linux*)
++	tmake_file="$tmake_file t-slibgcc-libgcc"
++	;;
+ xstormy16-*-elf)
+ 	tmake_file="stormy16/t-stormy16 t-fdpbit"
+ 	;;
