@@ -773,7 +773,7 @@ diff -urN --no-dereference binutils-clean/gas/Makefile.am binutils-workdir/gas/M
 diff -urN --no-dereference binutils-clean/gas/config/tc-xr17032.c binutils-workdir/gas/config/tc-xr17032.c
 --- binutils-clean/gas/config/tc-xr17032.c	1970-01-01 01:00:00.000000000 +0100
 +++ binutils-workdir/gas/config/tc-xr17032.c
-@@ -0,0 +1,1029 @@
+@@ -0,0 +1,1051 @@
 +/* tc-xr17032.c -- Assembler code for the XR/17032 CPU core.
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +
@@ -1316,6 +1316,13 @@ diff -urN --no-dereference binutils-clean/gas/config/tc-xr17032.c binutils-workd
 +}
 +
 +static bool
++xr17032_is_zero_expr (const expressionS *expr)
++{
++  return expr->X_op == O_constant && expr->X_add_number == 0
++	 && !expr->X_add_symbol && !expr->X_op_symbol;
++}
++
++static bool
 +xr17032_parse_mem_arg (argument *out, char *text, operand_type *type)
 +{
 +  char *bracket = strchr (text, '[');
@@ -1341,17 +1348,30 @@ diff -urN --no-dereference binutils-clean/gas/config/tc-xr17032.c binutils-workd
 +  if (disp_start == end)
 +    {
 +      /* either [regr], [regr_shift], or [imm16]. only [regr_shift] requires
-+       * is_reg=true. [regr] uses is_reg=true as well, because it's simpler. */
++       * is_reg=true. */
 +      if (xr17032_parse_regr (&tmp_arg, start, true, false))
 +	{
-+	  is_reg = true;
-+	  out->mem_val.base_reg = zero;
-+	  out->mem_val.offset_reg = tmp_arg.reg_val.base_reg;
 +	  out->mem_val.op_type = tmp_arg.reg_val.op_type;
 +	  out->mem_val.op_val = tmp_arg.reg_val.op_val;
++
++	  if (xr17032_is_zero_expr (&tmp_arg.reg_val.op_val.expr))
++	    {
++	      /* [regr] (or [regr_shift] with op_val=0, which is [regr]) */
++	      is_reg = false;
++	      out->mem_val.base_reg = tmp_arg.reg_val.base_reg;
++	      out->mem_val.offset_reg = zero;
++	    }
++	  else
++	    {
++	      /* [regr_shift] */
++	      is_reg = true;
++	      out->mem_val.base_reg = zero;
++	      out->mem_val.offset_reg = tmp_arg.reg_val.base_reg;
++	    }
 +	}
 +      else if (xr17032_parse_constant (&tmp_arg, start))
 +	{
++	  /* [imm16] */
 +	  is_reg = false;
 +	  out->mem_val.base_reg = zero;
 +	  out->mem_val.offset_reg = zero;
@@ -1368,6 +1388,7 @@ diff -urN --no-dereference binutils-clean/gas/config/tc-xr17032.c binutils-workd
 +      /* either [regr+imm16] or [regr+regr_shift]. only [regr+regr_shift] requires is_reg=true. */
 +      if (xr17032_parse_regr (&tmp_arg, disp_start, true, false))
 +	{
++	  /* [regr+regr_shift] */
 +	  is_reg = true;
 +	  out->mem_val.offset_reg = tmp_arg.reg_val.base_reg;
 +	  out->mem_val.op_type = tmp_arg.reg_val.op_type;
@@ -1375,6 +1396,7 @@ diff -urN --no-dereference binutils-clean/gas/config/tc-xr17032.c binutils-workd
 +	}
 +      else if (xr17032_parse_constant (&tmp_arg, disp_start))
 +	{
++	  /* [regr+imm16] */
 +	  is_reg = false;
 +	  out->mem_val.offset_reg = zero;
 +	  out->mem_val.op_type = reg_lsh;
