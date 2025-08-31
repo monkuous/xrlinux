@@ -210,7 +210,7 @@ diff -urN --no-dereference binutils-clean/bfd/cpu-xr17032.c binutils-workdir/bfd
 diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/bfd/elf32-xr17032.c
 --- binutils-clean/bfd/elf32-xr17032.c	1970-01-01 01:00:00.000000000 +0100
 +++ binutils-workdir/bfd/elf32-xr17032.c
-@@ -0,0 +1,390 @@
+@@ -0,0 +1,542 @@
 +/* BFD back-end for XR/17032 ELF
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +   Written by monkuous.
@@ -587,18 +587,170 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +  return true;
 +}
 +
++/* Relocate an XR/17032 ELF section.
++
++   The RELOCATE_SECTION function is called by the new ELF backend linker
++   to handle the relocations for a section.
++
++   The relocs are always passed as Rela structures; if the section
++   actually uses Rel structures, the r_addend field will always be
++   zero.
++
++   This function is responsible for adjusting the section contents as
++   necessary, and (if using Rela relocs and generating a relocatable
++   output file) adjusting the reloc addend as necessary.
++
++   This function does not have to worry about setting the reloc
++   address or the reloc symbol index.
++
++   LOCAL_SYMS is a pointer to the swapped in local symbols.
++
++   LOCAL_SECTIONS is an array giving the section in the input file
++   corresponding to the st_shndx field of each local symbol.
++
++   The global hash table entry for the global symbols can be found
++   via elf_sym_hashes (input_bfd).
++
++   When generating relocatable output, this function must handle
++   STB_LOCAL/STT_SECTION symbols specially.  The output symbol is
++   going to be the section symbol corresponding to the output
++   section, which means that the addend must be adjusted
++   accordingly.  */
++
++static int
++elf_xr17032_relocate_section (bfd *			output_bfd ATTRIBUTE_UNUSED,
++			      struct bfd_link_info *	info,
++			      bfd *			input_bfd,
++			      asection *		input_section,
++			      bfd_byte *		contents,
++			      Elf_Internal_Rela *	relocs,
++			      Elf_Internal_Sym *	local_syms,
++			      asection **		local_sections)
++{
++  Elf_Internal_Shdr *		symtab_hdr;
++  struct elf_link_hash_entry ** sym_hashes;
++  Elf_Internal_Rela *		rel;
++  Elf_Internal_Rela *		relend;
++
++  symtab_hdr = & elf_tdata (input_bfd)->symtab_hdr;
++  sym_hashes = elf_sym_hashes (input_bfd);
++  relend     = relocs + input_section->reloc_count;
++
++  for (rel = relocs; rel < relend; rel ++)
++    {
++      reloc_howto_type *	   howto;
++      unsigned long		   r_symndx;
++      Elf_Internal_Sym *	   sym;
++      asection *		   sec;
++      struct elf_link_hash_entry * h;
++      bfd_vma			   relocation;
++      bfd_reloc_status_type	   r;
++      const char *		   name = NULL;
++
++      r_symndx = ELF32_R_SYM (rel->r_info);
++      howto  = xr17032_elf_howto_table + ELF32_R_TYPE (rel->r_info);
++      h      = NULL;
++      sym    = NULL;
++      sec    = NULL;
++
++      if (r_symndx < symtab_hdr->sh_info)
++	{
++	  sym = local_syms + r_symndx;
++	  sec = local_sections [r_symndx];
++	  relocation = _bfd_elf_rela_local_sym (output_bfd, sym, &sec, rel);
++	}
++      else
++	{
++	  bool unresolved_reloc, warned, ignored;
++
++	  RELOC_FOR_GLOBAL_SYMBOL (info, input_bfd, input_section, rel,
++				   r_symndx, symtab_hdr, sym_hashes,
++				   h, sec, relocation,
++				   unresolved_reloc, warned, ignored);
++	}
++
++      if (sec != NULL && discarded_section (sec))
++	RELOC_AGAINST_DISCARDED_SECTION (info, input_bfd, input_section,
++					 rel, 1, relend, howto, 0, contents);
++
++      if (bfd_link_relocatable (info))
++	continue;
++
++      if (h != NULL)
++	name = h->root.root.string;
++      else
++	{
++	  name = (bfd_elf_string_from_elf_section
++		  (input_bfd, symtab_hdr->sh_link, sym->st_name));
++	  if (name == NULL || *name == '\0')
++	    name = bfd_section_name (sec);
++	}
++
++      r = _bfd_final_link_relocate (howto, input_bfd, input_section,
++				    contents, rel->r_offset,
++				    relocation, rel->r_addend);
++
++      if (r != bfd_reloc_ok)
++	{
++	  const char * msg = NULL;
++
++	  switch (r)
++	    {
++	    case bfd_reloc_overflow:
++	      (*info->callbacks->reloc_overflow)
++		(info, (h ? &h->root : NULL), name, howto->name,
++		 (bfd_vma) 0, input_bfd, input_section, rel->r_offset);
++	      break;
++
++	    case bfd_reloc_undefined:
++	      (*info->callbacks->undefined_symbol)
++		(info, name, input_bfd, input_section, rel->r_offset, true);
++	      break;
++
++	    case bfd_reloc_outofrange:
++	      msg = _("internal error: out of range error");
++	      break;
++
++	    case bfd_reloc_notsupported:
++	      msg = _("internal error: unsupported relocation error");
++	      break;
++
++	    case bfd_reloc_dangerous:
++	      msg = _("internal error: dangerous relocation");
++	      break;
++
++	    default:
++	      msg = _("internal error: unknown error");
++	      break;
++	    }
++
++	  if (msg)
++	    (*info->callbacks->warning) (info, msg, name, input_bfd,
++					 input_section, rel->r_offset);
++	}
++    }
++
++  return true;
++}
++
 +/* Definitions for setting XR/17032 target vector.  */
-+#define TARGET_LITTLE_SYM		  xr17032_elf32_vec
-+#define TARGET_LITTLE_NAME		  "elf32-xr17032"
-+#define ELF_ARCH			  bfd_arch_xr17032
-+#define ELF_MACHINE_CODE		  EM_XR17032
-+#define ELF_MAXPAGESIZE			  0x1000
++#define TARGET_LITTLE_SYM		     xr17032_elf32_vec
++#define TARGET_LITTLE_NAME		     "elf32-xr17032"
++#define ELF_ARCH			     bfd_arch_xr17032
++#define ELF_MACHINE_CODE		     EM_XR17032
++#define ELF_MAXPAGESIZE			     0x1000
 +
-+#define bfd_elf32_bfd_reloc_type_lookup	  elf_xr17032_reloc_type_lookup
-+#define bfd_elf32_bfd_reloc_name_lookup	  elf_xr17032_reloc_name_lookup
++#define bfd_elf32_bfd_reloc_type_lookup	     elf_xr17032_reloc_type_lookup
++#define bfd_elf32_bfd_reloc_name_lookup	     elf_xr17032_reloc_name_lookup
++#define bfd_elf32_bfd_link_hash_table_create _bfd_elf_link_hash_table_create
 +
-+#define elf_info_to_howto		  elf_xr17032_info_to_howto
-+#define elf_info_to_howto_rel		  NULL
++#define elf_info_to_howto		     elf_xr17032_info_to_howto
++#define elf_info_to_howto_rel		     NULL
++#define elf_backend_relocate_section	     elf_xr17032_relocate_section
++#define elf_backend_gc_mark_hook	     _bfd_elf_gc_mark_hook
++
++#define elf_backend_can_gc_sections	     1
++#define elf_backend_rela_normmal	     1
 +
 +#include "elf32-target.h"
 diff -urN --no-dereference binutils-clean/bfd/libbfd.h binutils-workdir/bfd/libbfd.h
