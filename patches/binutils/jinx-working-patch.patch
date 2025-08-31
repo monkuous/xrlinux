@@ -106,11 +106,15 @@ diff -urN --no-dereference binutils-clean/bfd/config.bfd binutils-workdir/bfd/co
  xtensa*)	 targ_archs=bfd_xtensa_arch ;;
  z80*|r800|z180|gbz80|ez80*)	 targ_archs=bfd_z80_arch ;;
  z8k*)		 targ_archs=bfd_z8k_arch ;;
-@@ -1449,6 +1450,10 @@
+@@ -1449,6 +1450,14 @@
      targ_selvecs="xgate_elf32_vec"
      ;;
  
 +  xr17032-*-linux-*)
++    targ_defvec=xr17032_elf32_vec
++    ;;
++
++  xr17032-*-elf)
 +    targ_defvec=xr17032_elf32_vec
 +    ;;
 +
