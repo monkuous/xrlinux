@@ -1,7 +1,7 @@
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/constraints.md gcc-workdir/gcc/config/xr17032/constraints.md
 --- gcc-clean/gcc/config/xr17032/constraints.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/constraints.md
-@@ -0,0 +1,56 @@
+@@ -0,0 +1,61 @@
 +;; Constraint definitions for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -33,7 +33,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/constraints.md gcc-workd
 +(define_constraint "J" "Signed 16-bit immediate"
 +  (and (match_code "const_int")
 +       (match_test "SMALL_OPERAND_SIGNED (ival)")))
-+       
++
 +(define_constraint "K" "Signed 5-bit immediate"
 +  (and (match_code "const_int")
 +       (match_test "(unsigned HOST_WIDE_INT) (ival) + 16 < 32")))
@@ -58,6 +58,11 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/constraints.md gcc-workd
 +(define_constraint "R"
 +  "A constraint that matches a PC-relative symbolic address."
 +  (match_operand 0 "xr17032_pcrel_symbolic_operand"))
++
++(define_constraint "A"
++  "Memory operand whose address is a single register"
++  (and (match_code "mem")
++       (match_test "GET_CODE (XEXP (op, 0)) == REG")))
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/predicates.md gcc-workdir/gcc/config/xr17032/predicates.md
 --- gcc-clean/gcc/config/xr17032/predicates.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/predicates.md
@@ -155,7 +160,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/predicates.md gcc-workdi
 +  return (xr17032_symbolic_constant_p (op, &type)
 +	  && (type == XR17032_SYMBOL_ABSOLUTE));
 +})
-+  
++
 +(define_predicate "xr17032_pcrel_symbolic_operand"
 +  (match_code "const,symbol_ref,label_ref")
 +{
@@ -179,7 +184,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/predicates.md gcc-workdi
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032-protos.h gcc-workdir/gcc/config/xr17032/xr17032-protos.h
 --- gcc-clean/gcc/config/xr17032/xr17032-protos.h	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032-protos.h
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,39 @@
 +/* Prototypes for xr17032.cc functions used in the md file & elsewhere.
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +
@@ -216,12 +221,13 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032-protos.h gcc-wor
 +extern void xr17032_init_cumulative_args (CUMULATIVE_ARGS *, tree, rtx, tree,
 +					  int);
 +extern bool xr17032_symbolic_constant_p (rtx, enum xr17032_symbol_type *);
++extern enum memmodel xr17032_union_memmodel (enum memmodel a, enum memmodel b);
 +
 +#endif /* GCC_XR17032_PROTOS_H */
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/gcc/config/xr17032/xr17032.cc
 --- gcc-clean/gcc/config/xr17032/xr17032.cc	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.cc
-@@ -0,0 +1,1275 @@
+@@ -0,0 +1,1319 @@
 +/* Target Code for XR/17032
 +   Copyright (C) 2025-2025 Free Softwa*re Foundation, Inc.
 +   Contributed by monkuous.
@@ -1117,6 +1123,8 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +  switch (code)
 +    {
 +    case 0:
++    case 'a':
++    case 'z':
 +      break;
 +    default:
 +      xr17032_operand_error ("invalid operand modifier", x);
@@ -1129,6 +1137,11 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +      fprintf (file, "%s", reg_names[REGNO (x)]);
 +      return;
 +    case MEM:
++      if (code == 'a')
++	{
++	  xr17032_print_operand (file, XEXP (x, 0), 0);
++	  return;
++	}
 +      output_address (GET_MODE (x), XEXP (x, 0));
 +      return;
 +    case PLUS:
@@ -1157,6 +1170,12 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +      xr17032_print_operand (file, XEXP (x, 1), code);
 +      return;
 +    default:
++      if (code == 'z' && CONST_INT_P (x) && INTVAL (x) == 0)
++	{
++	  fputs (reg_names[XR17032_ZERO], file);
++	  return;
++	}
++
 +      output_addr_const (file, x);
 +      return;
 +    }
@@ -1182,6 +1201,12 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +static void
 +xr17032_print_operand_address (FILE *file, machine_mode mode, rtx x)
 +{
++  if (mode == VOIDmode)
++    {
++      xr17032_print_operand (file, x, 'a');
++      return;
++    }
++
 +  fprintf (file, "%s [", xr17032_mode_id (mode));
 +  xr17032_print_operand (file, x, 0);
 +  fprintf (file, "]");
@@ -1458,6 +1483,31 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +  std_expand_builtin_va_start (valist, nextarg);
 +}
 +
++enum memmodel
++xr17032_union_memmodel (enum memmodel a, enum memmodel b)
++{
++  enum memmodel weaker = a <= b ? a : b;
++  enum memmodel stronger = a > b ? a : b;
++
++  switch (stronger)
++    {
++      case MEMMODEL_SEQ_CST:
++      case MEMMODEL_ACQ_REL:
++	return stronger;
++      case MEMMODEL_RELEASE:
++	if (weaker == MEMMODEL_ACQUIRE || weaker == MEMMODEL_CONSUME)
++	  return MEMMODEL_ACQ_REL;
++	else
++	  return stronger;
++      case MEMMODEL_ACQUIRE:
++      case MEMMODEL_CONSUME:
++      case MEMMODEL_RELAXED:
++	return stronger;
++      default:
++	gcc_unreachable ();
++    }
++}
++
 +#undef TARGET_OPTION_OVERRIDE
 +#define TARGET_OPTION_OVERRIDE xr17032_option_override
 +
@@ -1500,7 +1550,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gcc/config/xr17032/xr17032.h
 --- gcc-clean/gcc/config/xr17032/xr17032.h	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.h
-@@ -0,0 +1,251 @@
+@@ -0,0 +1,252 @@
 +/* Target Definitions for XR/17032.
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +   Contributed by monkuous.
@@ -1750,12 +1800,13 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gc
 +  (((VALUE) >= ((IMM_REACH & ~3) + 1)) && ((VALUE) <= ((IMM_REACH & ~3) * 2)))
 +
 +#define SHIFT_COUNT_TRUNCATED 1
++#define LOAD_EXTEND_OP(MODE) ZERO_EXTEND
 +
 +#endif /* GCC_XR17032_H */
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/gcc/config/xr17032/xr17032.md
 --- gcc-clean/gcc/config/xr17032/xr17032.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.md
-@@ -0,0 +1,507 @@
+@@ -0,0 +1,706 @@
 +;; Machine description for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -1786,6 +1837,8 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +
 +(define_c_enum "unspec" [
 +  UNSPEC_TIE
++  UNSPEC_COMPARE_AND_SWAP
++  UNSPEC_COMPARE_AND_SWAP_SHORT
 +])
 +
 +;; -------------------------------------------------------------------------
@@ -2099,7 +2152,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +   mod\t%0,zero,zero")
 +
 +;; -------------------------------------------------------------------------
-+;; j instruction
++;; jumps
 +;; -------------------------------------------------------------------------
 +
 +(define_insn "jump"
@@ -2107,6 +2160,12 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +	(label_ref (match_operand 0 "" "")))]
 +  ""
 +  "beq zero,%0")
++
++(define_insn "indirect_jump"
++  [(set (pc)
++	(match_operand:SI 0 "register_operand" "r"))]
++  ""
++  "jalr\tzero,%0,0")
 +
 +;; -------------------------------------------------------------------------
 +;; jal instruction
@@ -2219,7 +2278,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +  ""
 +{
 +  int code = GET_CODE (operands[0]);
-+  
++
 +  if (code == LTU || code == GTU || code == LEU || code == GEU)
 +    {
 +      rtx reg = gen_reg_rtx (SImode);
@@ -2263,6 +2322,197 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +  [(trap_if (const_int 1) (const_int 0))]
 +  ""
 +  "brk")
++
++;; -------------------------------------------------------------------------
++;; extension
++;; -------------------------------------------------------------------------
++
++(define_mode_iterator HISI [HI SI])
++
++(define_insn "extendqi<mode>2"
++  [(set (match_operand:HISI                 0 "register_operand" "=r")
++	(sign_extend:HISI (match_operand:QI 1 "register_operand" " r")))]
++  ""
++  "add\t%0,zero,%1 LSH 24\;add\t%0,zero,%0 ASH 24"
++  [(set (attr "length") (const_int 8))])
++
++(define_insn "extendhisi2"
++  [(set (match_operand:SI                 0 "register_operand" "=r")
++	(sign_extend:SI (match_operand:HI 1 "register_operand" " r")))]
++  ""
++  "add\t%0,zero,%1 LSH 16\;add\t%0,zero,%0 ASH 16"
++  [(set (attr "length") (const_int 8))])
++
++(define_insn "zero_extendqi<mode>2"
++  [(set (match_operand:HISI                 0 "register_operand" "=r")
++	(zero_extend:HISI (match_operand:QI 1 "register_operand" " r")))]
++  ""
++  "add\t%0,zero,%1 LSH 24\;add\t%0,zero,%0 RSH 24"
++  [(set (attr "length") (const_int 8))])
++
++(define_insn "zero_extendhisi2"
++  [(set (match_operand:SI                 0 "register_operand" "=r")
++	(zero_extend:SI (match_operand:HI 1 "register_operand" " r")))]
++  ""
++  "add\t%0,zero,%1 LSH 16\;add\t%0,zero,%0 RSH 16"
++  [(set (attr "length") (const_int 8))])
++
++;; -------------------------------------------------------------------------
++;; atomics
++;; -------------------------------------------------------------------------
++
++(define_expand "mem_thread_fence"
++  [(match_operand:SI 0 "const_int_operand" "")] ;; model
++  ""
++{
++  enum memmodel model = memmodel_base (INTVAL (operands[0]));
++  if (model != MEMMODEL_RELAXED)
++    {
++      rtx mem = gen_rtx_MEM (BLKmode, gen_rtx_SCRATCH (Pmode));
++      MEM_VOLATILE_P (mem) = 1;
++      emit_insn (gen_xr17032_mem_thread_fence (mem, operands[0]));
++    }
++  DONE;
++})
++
++(define_insn "xr17032_mem_thread_fence"
++  [(set (match_operand:BLK 0 "")
++        (match_dup 0))
++   (match_operand:SI 1 "const_int_operand" "")] ;; model
++  ""
++{
++  enum memmodel model = (enum memmodel) INTVAL (operands[1]);
++  model = memmodel_base (model);
++  if (model == MEMMODEL_SEQ_CST)
++    return "mb";
++  else if (model == MEMMODEL_ACQ_REL)
++    return "mb";
++  else if (model == MEMMODEL_ACQUIRE)
++    return "mb";
++  else if (model == MEMMODEL_RELEASE)
++    return "wmb";
++  else
++    gcc_unreachable ();
++})
++
++(define_mode_iterator MSHORT [QI HI])
++
++(define_expand "atomic_compare_and_swap<mode>"
++  [(match_operand:SI 0 "register_operand"             "")  ;; bool output
++   (match_operand:MEMORY 1 "register_operand"         "")  ;; val output
++   (match_operand:MEMORY 2 "memory_operand"           "")  ;; memory
++   (match_operand:MEMORY 3 "xr17032_reg_or_0_operand" "")  ;; expected value
++   (match_operand:MEMORY 4 "xr17032_reg_or_0_operand" "")  ;; desired value
++   (match_operand:SI 5 "const_int_operand"            "")  ;; is_weak
++   (match_operand:SI 6 "const_int_operand"            "")  ;; mod_s
++   (match_operand:SI 7 "const_int_operand"            "")] ;; mod_f
++  ""
++{
++  enum memmodel smod = memmodel_base (INTVAL (operands[6]));
++  enum memmodel fmod = memmodel_base (INTVAL (operands[7]));
++  enum memmodel model = xr17032_union_memmodel (smod, fmod);
++
++  enum memmodel m1 = model == MEMMODEL_ACQ_REL ? MEMMODEL_RELEASE : model;
++  enum memmodel m2 = model == MEMMODEL_ACQ_REL ? MEMMODEL_ACQUIRE : model;
++
++  if (m1 == MEMMODEL_SEQ_CST || m1 == MEMMODEL_RELEASE)
++      emit_insn (gen_mem_thread_fence (GEN_INT (m1)));
++
++  emit_insn (gen_xr17032_cas<mode> (operands[1], operands[2], operands[3],
++				    operands[4]));
++
++  if (m2 == MEMMODEL_SEQ_CST || m2 == MEMMODEL_ACQUIRE)
++      emit_insn (gen_mem_thread_fence (GEN_INT (m2)));
++
++  rtx val = operands[1];
++  rtx exp = operands[3];
++
++  if (<MODE>mode != SImode)
++    {
++      val = gen_reg_rtx (SImode);
++      exp = gen_reg_rtx (SImode);
++      emit_move_insn (val, gen_rtx_ZERO_EXTEND (SImode, operands[1]));
++      emit_move_insn (exp, gen_rtx_ZERO_EXTEND (SImode, operands[3]));
++    }
++
++  rtx compare = val;
++  if (exp != const0_rtx)
++    {
++      rtx difference = gen_rtx_MINUS(SImode, val, exp);
++      compare = gen_reg_rtx (SImode);
++      emit_insn (gen_rtx_SET (compare, difference));
++    }
++
++  emit_insn (gen_rtx_SET (operands[0],
++			  gen_rtx_IF_THEN_ELSE (SImode,
++						gen_rtx_LTU (SImode, compare,
++							     const1_rtx),
++						const1_rtx, const0_rtx)));
++  DONE;
++})
++
++(define_insn "xr17032_cassi"
++  [(set (match_operand:SI 0 "register_operand" "=&r,&r")
++        (match_operand:SI 1 "memory_operand"   "+ A, A"))
++   (set (match_dup 1)
++        (unspec_volatile:SI [(match_operand:SI 2 "xr17032_reg_or_0_operand" " r, O")
++			     (match_operand:SI 3 "xr17032_reg_or_0_operand" "rO,rO")]
++			    UNSPEC_COMPARE_AND_SWAP))
++   (clobber (match_scratch:SI 4 "=&r,&r"))]
++  ""
++  "@
++   1:\;ll\t%0,%a1\;sub\t%4,%0,%z2\;bne\t%4,1f\;sc\t%4,%a1,%z3\;beq\t%4,1b\;1:
++   1:\;ll\t%0,%a1\;bne\t%0,1f\;sc\t%4,%a1,%z3\;beq\t%4,1b\;1:"
++  [(set_attr_alternative "length" [(const_int 20) (const_int 16)])])
++
++(define_expand "xr17032_cas<mode>"
++  [(match_operand:MSHORT 0 "register_operand")
++   (match_operand:MSHORT 1 "memory_operand")
++   (match_operand:MSHORT 2 "xr17032_reg_or_0_operand")
++   (match_operand:MSHORT 3 "xr17032_reg_or_0_operand")]
++  ""
++{
++  rtx addr = force_reg (Pmode, XEXP (operands[1], 0));
++  rtx offs = gen_reg_rtx (SImode);
++  rtx raddr = gen_reg_rtx (SImode);
++  rtx shift = gen_reg_rtx (SImode);
++  rtx pmask = gen_reg_rtx (SImode);
++  rtx nmask = gen_reg_rtx (SImode);
++  rtx shexp = gen_reg_rtx (SImode);
++  rtx shnew = gen_reg_rtx (SImode);
++  rtx value = gen_reg_rtx (SImode);
++  rtx shval = gen_reg_rtx (SImode);
++  emit_move_insn (offs, gen_rtx_AND (SImode, addr, GEN_INT (3)));
++  emit_move_insn (raddr, gen_rtx_MINUS (SImode, addr, offs));
++  emit_move_insn (shift, gen_rtx_ASHIFT (SImode, offs, GEN_INT (3)));
++  emit_move_insn (pmask, GEN_INT (GET_MODE_MASK (<MODE>mode)));
++  emit_move_insn (pmask, gen_rtx_ASHIFT (SImode, pmask, shift));
++  emit_move_insn (nmask, gen_rtx_XOR (SImode, pmask, GEN_INT (-1)));
++  emit_move_insn (shexp, gen_lowpart (SImode, operands[2]));
++  emit_move_insn (shexp, gen_rtx_ASHIFT (SImode, shexp, shift));
++  emit_move_insn (shnew, gen_lowpart (SImode, operands[3]));
++  emit_move_insn (shnew, gen_rtx_ASHIFT (SImode, shnew, shift));
++  emit_insn (gen_xr17032_cas_short (value, gen_rtx_MEM (SImode, addr), shexp,
++				    shnew, pmask, nmask));
++  emit_move_insn (shval, gen_rtx_LSHIFTRT (SImode, value, shift));
++  emit_move_insn (operands[0], gen_lowpart (<MODE>mode, shval));
++  DONE;
++})
++
++(define_insn "xr17032_cas_short"
++  [(set (match_operand:SI 0 "register_operand" "=&r")
++        (match_operand:SI 1 "memory_operand"   "+ A"))
++   (set (match_dup 1)
++        (unspec_volatile:SI [(match_operand:SI 2 "register_operand" "r")
++			     (match_operand:SI 3 "register_operand" "r")
++			     (match_operand:SI 4 "register_operand" "r")
++			     (match_operand:SI 5 "register_operand" "r")]
++			    UNSPEC_COMPARE_AND_SWAP_SHORT))
++   (clobber (match_scratch:SI 6 "=&r"))
++   (clobber (match_scratch:SI 7 "=&r"))]
++  ""
++  "1:\;ll\t%6,%a1\;and\t%0,%6,%4\;sub\t%7,%0,%2\;bne\t%7,1f\;and\t%6,%6,%5\;or\t%6,%6,%3\;sc\t%6,%a1,%6\;beq\t%6,1b\;1:"
++  [(set_attr_alternative "length" [(const_int 32)])])
 diff -urN --no-dereference gcc-clean/gcc/config.gcc gcc-workdir/gcc/config.gcc
 --- gcc-clean/gcc/config.gcc
 +++ gcc-workdir/gcc/config.gcc
