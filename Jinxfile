@@ -3,6 +3,7 @@
 JINX_MAJOR_VER=0.6
 
 TRIPLE="${JINX_ARCH}"-unknown-linux-gnu
+BUILD_TYPE="${JINX_BUILD_TYPE:-RelWithDebInfo}"
 
 autotools_regen() {
     find . '(' -name configure.ac -o -name configure.in ')' -type f -print0 \

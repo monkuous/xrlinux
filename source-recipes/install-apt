@@ -1,0 +1,5 @@
+#! /bin/sh
+
+name=install-apt
+version=0
+source_dir=install-apt

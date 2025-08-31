@@ -1,0 +1,21 @@
+#! /bin/sh
+
+name=install-apt
+from_source=install-apt
+revision=1
+imagedeps="build-essential cmake ninja-build"
+
+configure() {
+    cmake "${source_dir}"                                                     \
+        -G Ninja                                                              \
+        -DCMAKE_INSTALL_PREFIX="${prefix}"                                    \
+        -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
+}
+
+build() {
+    cmake --build . -j"${parallelism}"
+}
+
+package() {
+    DESTDIR="${dest_dir}" cmake --install .
+}
