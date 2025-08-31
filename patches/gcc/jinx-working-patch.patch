@@ -1,7 +1,7 @@
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/constraints.md gcc-workdir/gcc/config/xr17032/constraints.md
 --- gcc-clean/gcc/config/xr17032/constraints.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/constraints.md
-@@ -0,0 +1,54 @@
+@@ -0,0 +1,56 @@
 +;; Constraint definitions for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -46,8 +46,10 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/constraints.md gcc-workd
 +  (and (match_code "const_int")
 +       (match_test "((unsigned HOST_WIDE_INT) (ival) & 0xffffffff) == 0xffffffff")))
 +
-+(define_constraint "a" "Register with potential shift"
-+  (match_operand 0 "xr17032_reg_shift_operand"))
++(define_constraint "P" "Negative unsigned 16-bit immediate"
++  (and (match_code "const_int")
++       (match_test "(unsigned HOST_WIDE_INT) (ival) + (IMM_REACH - 1)
++                    < IMM_REACH")))
 +
 +(define_constraint "S"
 +  "A constraint that matches an absolute symbolic address."
@@ -59,7 +61,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/constraints.md gcc-workd
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/predicates.md gcc-workdir/gcc/config/xr17032/predicates.md
 --- gcc-clean/gcc/config/xr17032/predicates.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/predicates.md
-@@ -0,0 +1,103 @@
+@@ -0,0 +1,114 @@
 +;; Predicate description for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -126,14 +128,25 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/predicates.md gcc-workdi
 +  (and (match_code "const_int")
 +       (match_test "SMALL_OPERAND (INTVAL (op))")))
 +
++(define_predicate "xr17032_smallimm_operand_signed"
++  (and (match_code "const_int")
++       (match_test "SMALL_OPERAND_SIGNED (INTVAL (op))")))
++
 +(define_predicate "xr17032_move_operand"
 +  (ior (match_operand 0 "register_operand")
 +       (match_operand 0 "memory_operand")
-+       (match_operand 0 "xr17032_smallimm_operand")))
++       (match_operand 0 "xr17032_smallimm_operand")
++       (and (match_code "const_int")
++            (match_test "(unsigned HOST_WIDE_INT) INTVAL (op) + (IMM_REACH - 1)
++                         < IMM_REACH"))))
 +
 +(define_predicate "xr17032_arith_operand"
-+  (ior (match_operand 0 "xr17032_reg_shift_operand")
++  (ior (match_operand 0 "register_operand")
 +       (match_operand 0 "xr17032_smallimm_operand")))
++
++(define_predicate "xr17032_arith_operand_signed"
++  (ior (match_operand 0 "register_operand")
++       (match_operand 0 "xr17032_smallimm_operand_signed")))
 +
 +(define_predicate "xr17032_absolute_symbolic_operand"
 +  (match_code "const,symbol_ref,label_ref")
@@ -1487,7 +1500,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gcc/config/xr17032/xr17032.h
 --- gcc-clean/gcc/config/xr17032/xr17032.h	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.h
-@@ -0,0 +1,243 @@
+@@ -0,0 +1,251 @@
 +/* Target Definitions for XR/17032.
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +   Contributed by monkuous.
@@ -1706,6 +1719,14 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gc
 +#define READONLY_DATA_SECTION_ASM_OP	"\t.section\t.rodata"
 +#define BSS_SECTION_ASM_OP		"\t.bss"
 +
++#ifndef ASM_APP_ON
++#define ASM_APP_ON " #APP\n"
++#endif
++
++#ifndef ASM_APP_OFF
++#define ASM_APP_OFF " #NO_APP\n"
++#endif
++
 +#define IMM_BITS 16
 +#define IMM_REACH (1LL << IMM_BITS)
 +
@@ -1734,7 +1755,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gc
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/gcc/config/xr17032/xr17032.md
 --- gcc-clean/gcc/config/xr17032/xr17032.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.md
-@@ -0,0 +1,492 @@
+@@ -0,0 +1,507 @@
 +;; Machine description for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -1828,26 +1849,38 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +	reg = operands[0];
 +      else
 +	{
-+	  gcc_assert (! (reload_in_progress || reload_completed));
++	  gcc_assert (!(reload_in_progress || reload_completed));
 +	  reg = gen_reg_rtx (<MODE>mode);
 +	}
-+      if (CONST_INT_P (operands[1]) && (INTVAL (operands[1]) & 0xffffffff) == 0xffffffff)
-+	emit_insn (gen_xorsi3 (reg, CONST0_RTX (SImode), operands[1]));
++      emit_insn (gen_xr17032_const32 (reg, operands[1]));
++      if (register_operand (operands[0], <MODE>mode))
++	DONE;
 +      else
-+	emit_insn (gen_xr17032_const32 (reg, operands[1]));
-+      if (!register_operand (operands[0], <MODE>mode))
-+	emit_move_insn (operands[0], reg);
-+      DONE;
++	operands[1] = reg;
 +    }
-+  else if (MEM_P (operands[0]) && MEM_P (operands[1]))
++  else if (MEM_P (operands[0])
++      && !(register_operand (operands[1], <MODE>mode)
++	   || xr17032_tinyimm_operand (operands[1], <MODE>mode)))
 +    {
-+      gcc_assert (! (reload_in_progress || reload_completed));
++      gcc_assert (!(reload_in_progress || reload_completed));
 +      rtx reg = gen_reg_rtx (<MODE>mode);
 +      emit_move_insn (reg, operands[1]);
-+      emit_move_insn (operands[0], reg);
-+      DONE;
++      operands[1] = reg;
 +    }
 +})
++
++(define_insn "*mov<mode>"
++  [(set (match_operand:MEMORY 0 "nonimmediate_operand" "=r,r,r,r, m")
++        (match_operand:MEMORY 1 "xr17032_move_operand" " r,I,P,m,rK"))]
++  "register_operand (operands[0], <MODE>mode)
++    || register_operand (operands[1], <MODE>mode)
++    || xr17032_tinyimm_operand (operands[1], <MODE>mode)"
++  "@
++   add\t%0,%1,zero
++   addi\t%0,zero,%1
++   subi\t%0,zero,-(%1)
++   mov\t%0,%1
++   mov\t%0,%1")
 +
 +(define_insn "xr17032_const32"
 +  [(set (match_operand:SI 0 "register_operand"  "=r,r")
@@ -1859,20 +1892,6 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +  [(set (attr "length")
 +	(const_int 8))])
 +
-+(define_insn "*mov<mode>"
-+  [(set (match_operand:MEMORY 0 "nonimmediate_operand" "=r,r,r,r,m, m")
-+        (match_operand:MEMORY 1 "xr17032_move_operand" " r,O,I,m,O,rK"))]
-+  "register_operand (operands[0], <MODE>mode)
-+    || register_operand (operands[1], <MODE>mode)
-+    || xr17032_tinyimm_operand (operands[1], <MODE>mode)"
-+  "@
-+   add\t%0,%1,zero
-+   add\t%0,zero,zero
-+   addi\t%0,zero,%1
-+   mov\t%0,%1
-+   mov\t%0,zero
-+   mov\t%0,%1")
-+
 +;; -------------------------------------------------------------------------
 +;; add instruction
 +;; -------------------------------------------------------------------------
@@ -1880,14 +1899,14 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +(define_insn "addsi3"
 +  [(set (match_operand:SI          0 "register_operand"         "=r,r,r,r")
 +	(plus:SI (match_operand:SI 1 "xr17032_reg_or_0_operand" " r,r,O,O")
-+		 (match_operand:SI 2 "xr17032_arith_operand"    " a,I,a,I")))]
++		 (match_operand:SI 2 "xr17032_arith_operand"    " r,I,r,I")))]
 +  ""
 +  "@
 +   add\t%0,%1,%2
 +   addi\t%0,%1,%2
 +   add\t%0,zero,%2
 +   addi\t%0,zero,%2")
-+   
++
 +;; -------------------------------------------------------------------------
 +;; sub instruction
 +;; -------------------------------------------------------------------------
@@ -1895,7 +1914,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +(define_insn "subsi3"
 +  [(set (match_operand:SI           0 "register_operand"         "=r,r,r,r")
 +	(minus:SI (match_operand:SI 1 "xr17032_reg_or_0_operand" " r,r,O,O")
-+		  (match_operand:SI 2 "xr17032_arith_operand"    " a,I,a,I")))]
++		  (match_operand:SI 2 "xr17032_arith_operand"    " r,I,r,I")))]
 +  ""
 +  "@
 +   sub\t%0,%1,%2
@@ -1910,7 +1929,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +(define_insn "andsi3"
 +  [(set (match_operand:SI         0 "register_operand"         "=r,r,r,r")
 +	(and:SI (match_operand:SI 1 "xr17032_reg_or_0_operand" " r,r,O,O")
-+		(match_operand:SI 2 "xr17032_arith_operand"    " a,I,a,I")))]
++		(match_operand:SI 2 "xr17032_arith_operand"    " r,I,r,I")))]
 +  ""
 +  "@
 +   and\t%0,%1,%2
@@ -1925,7 +1944,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +(define_insn "xorsi3"
 +  [(set (match_operand:SI         0 "register_operand"          "=r,r,r,r,r,r")
 +	(xor:SI (match_operand:SI 1 "xr17032_reg_or_0_operand"  " r,r,O,O,r,O")
-+		(match_operand:SI 2 "xr17032_xor_arith_operand" " a,I,a,I,M,M")))]
++		(match_operand:SI 2 "xr17032_xor_arith_operand" " r,I,r,I,P,P")))]
 +  ""
 +  "@
 +   xor\t%0,%1,%2
@@ -1942,7 +1961,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +(define_insn "iorsi3"
 +  [(set (match_operand:SI         0 "register_operand"         "=r,r,r,r")
 +	(ior:SI (match_operand:SI 1 "xr17032_reg_or_0_operand" " r,r,O,O")
-+		(match_operand:SI 2 "xr17032_arith_operand"    " a,I,a,I")))]
++		(match_operand:SI 2 "xr17032_arith_operand"    " r,I,r,I")))]
 +  ""
 +  "@
 +   or\t%0,%1,%2
@@ -2029,8 +2048,8 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +
 +(define_insn "mulsi3"
 +  [(set (match_operand:SI       0 "register_operand"         "=r,r,r,r")
-+        (mult (match_operand:SI 1 "xr17032_reg_or_0_operand" " r,r,O,O")
-+	      (match_operand:SI 2 "xr17032_reg_or_0_operand" " r,O,r,O")))]
++        (mult:SI (match_operand:SI 1 "xr17032_reg_or_0_operand" " r,r,O,O")
++	         (match_operand:SI 2 "xr17032_reg_or_0_operand" " r,O,r,O")))]
 +  ""
 +  "@
 +   mul\t%0,%1,%2
@@ -2044,8 +2063,8 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +
 +(define_insn "udivsi3"
 +  [(set (match_operand:SI       0 "register_operand"         "=r,r,r,r")
-+        (udiv (match_operand:SI 1 "xr17032_reg_or_0_operand" " r,r,O,O")
-+	      (match_operand:SI 2 "xr17032_reg_or_0_operand" " r,O,r,O")))]
++        (udiv:SI (match_operand:SI 1 "xr17032_reg_or_0_operand" " r,r,O,O")
++	         (match_operand:SI 2 "xr17032_reg_or_0_operand" " r,O,r,O")))]
 +  ""
 +  "@
 +   div\t%0,%1,%2
@@ -2055,8 +2074,8 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +
 +(define_insn "divsi3"
 +  [(set (match_operand:SI      0 "register_operand"         "=r,r,r,r")
-+        (div (match_operand:SI 1 "xr17032_reg_or_0_operand" " r,r,O,O")
-+	     (match_operand:SI 2 "xr17032_reg_or_0_operand" " r,O,r,O")))]
++        (div:SI (match_operand:SI 1 "xr17032_reg_or_0_operand" " r,r,O,O")
++	        (match_operand:SI 2 "xr17032_reg_or_0_operand" " r,O,r,O")))]
 +  ""
 +  "@
 +   div signed\t%0,%1,%2
@@ -2070,8 +2089,8 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +
 +(define_insn "umodsi3"
 +  [(set (match_operand:SI       0 "register_operand"         "=r,r,r,r")
-+        (umod (match_operand:SI 1 "xr17032_reg_or_0_operand" " r,r,O,O")
-+	      (match_operand:SI 2 "xr17032_reg_or_0_operand" " r,O,r,O")))]
++        (umod:SI (match_operand:SI 1 "xr17032_reg_or_0_operand" " r,r,O,O")
++	         (match_operand:SI 2 "xr17032_reg_or_0_operand" " r,O,r,O")))]
 +  ""
 +  "@
 +   mod\t%0,%1,%2
@@ -2087,7 +2106,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +  [(set (pc)
 +	(label_ref (match_operand 0 "" "")))]
 +  ""
-+  "j\t%0")
++  "beq zero,%0")
 +
 +;; -------------------------------------------------------------------------
 +;; jal instruction
@@ -2147,31 +2166,48 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +
 +(define_code_iterator cond [eq ne lt gt ge le])
 +
-+(define_code_iterator ltcond [ltu lt])
-+(define_code_attr asm_ltcond [(ltu "") (lt " signed")])
-+
 +(define_expand "cstoresi4"
 +  [(set (match_operand:SI                  0 "register_operand")
 +	(if_then_else (match_operator      1 "xr17032_slt_operator"
 +			[(match_operand:SI 2 "xr17032_reg_or_0_operand")
-+			 (match_operand:SI 3 "xr17032_arith_operand")])
++			 (match_operand:SI 3 "")])
 +		      (const_int 1)
 +		      (const_int 0)))]
 +  ""
-+  "")
++{
++  if (GET_CODE (operands[1]) == LTU
++      && !xr17032_arith_operand (operands[3], SImode))
++    FAIL;
++  else if (GET_CODE (operands[1]) == LT
++	   && !xr17032_arith_operand_signed (operands[3], SImode))
++    FAIL;
++})
 +
-+(define_insn "xr17032_s<code>"
-+  [(set (match_operand:SI                       0 "register_operand"         "=r,r,r,r")
-+        (if_then_else (ltcond (match_operand:SI 1 "xr17032_reg_or_0_operand" " r,r,O,O")
-+			      (match_operand:SI 2 "xr17032_arith_operand"    " a,I,a,I"))
++(define_insn "xr17032_sltu"
++  [(set (match_operand:SI                    0 "register_operand"         "=r,r,r,r")
++        (if_then_else (ltu (match_operand:SI 1 "xr17032_reg_or_0_operand" " r,r,O,O")
++			   (match_operand:SI 2 "xr17032_arith_operand"    " r,I,r,I"))
 +		      (const_int 1)
 +		      (const_int 0)))]
 +  ""
 +  "@
-+   slt<asm_ltcond>\t%0,%1,%2
-+   slti<asm_ltcond>\t%0,%1,%2
-+   slt<asm_ltcond>\t%0,zero,%2
-+   slti<asm_ltcond>\t%0,zero,%2")
++   slt\t%0,%1,%2
++   slti\t%0,%1,%2
++   slt\t%0,zero,%2
++   slti\t%0,zero,%2")
++
++(define_insn "xr17032_slt"
++  [(set (match_operand:SI                   0 "register_operand"             "=r,r,r,r")
++        (if_then_else (lt (match_operand:SI 1 "xr17032_reg_or_0_operand"     " r,r,O,O")
++			  (match_operand:SI 2 "xr17032_arith_operand_signed" " r,J,r,J"))
++		      (const_int 1)
++		      (const_int 0)))]
++  ""
++  "@
++   slt signed\t%0,%1,%2
++   slti signed\t%0,%1,%2
++   slt signed\t%0,zero,%2
++   slti signed\t%0,zero,%2")
 +
 +(define_expand "cbranchsi4"
 +  [(set (pc)
