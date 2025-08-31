@@ -187,7 +187,7 @@ diff -urN --no-dereference binutils-clean/bfd/cpu-xr17032.c binutils-workdir/bfd
 +
 +  memset(p, 0, count);
 +
-+  return p;
++  return fill;
 +}
 +
 +const bfd_arch_info_type bfd_xr17032_arch =
@@ -294,7 +294,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 29,			     /* bitsize */
 +	 false,			     /* pc_relative */
 +	 3,			     /* bitpos */
-+	 complain_overflow_unsigned, /* complain_on_overflow */
++	 complain_overflow_dont,     /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_IMM29",	     /* name */
 +	 false,			     /* partial_inplace */
@@ -307,7 +307,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 16,			     /* bitsize */
 +	 false,			     /* pc_relative */
 +	 16,			     /* bitpos */
-+	 complain_overflow_unsigned, /* complain_on_overflow */
++	 complain_overflow_dont,     /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_IMM16",	     /* name */
 +	 false,			     /* partial_inplace */
@@ -320,7 +320,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 16,			     /* bitsize */
 +	 false,			     /* pc_relative */
 +	 16,			     /* bitpos */
-+	 complain_overflow_unsigned, /* complain_on_overflow */
++	 complain_overflow_dont,     /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_IMM16_1",	     /* name */
 +	 false,			     /* partial_inplace */
@@ -333,7 +333,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 16,			     /* bitsize */
 +	 false,			     /* pc_relative */
 +	 16,			     /* bitpos */
-+	 complain_overflow_unsigned, /* complain_on_overflow */
++	 complain_overflow_dont,     /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_IMM16_2",	     /* name */
 +	 false,			     /* partial_inplace */
@@ -346,7 +346,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 16,			     /* bitsize */
 +	 false,			     /* pc_relative */
 +	 16,			     /* bitpos */
-+	 complain_overflow_unsigned, /* complain_on_overflow */
++	 complain_overflow_dont,     /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_IMM16_16",	     /* name */
 +	 false,			     /* partial_inplace */
@@ -359,7 +359,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 16,			     /* bitsize */
 +	 false,			     /* pc_relative */
 +	 16,			     /* bitpos */
-+	 complain_overflow_signed,   /* complain_on_overflow */
++	 complain_overflow_dont,     /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_SIMM16",	     /* name */
 +	 false,			     /* partial_inplace */
@@ -372,7 +372,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 16,			     /* bitsize */
 +	 true,			     /* pc_relative */
 +	 16,			     /* bitpos */
-+	 complain_overflow_signed,   /* complain_on_overflow */
++	 complain_overflow_dont,     /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_DISP16_16",	     /* name */
 +	 false,			     /* partial_inplace */
@@ -385,7 +385,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 5,			     /* bitsize */
 +	 false,			     /* pc_relative */
 +	 11,			     /* bitpos */
-+	 complain_overflow_signed,   /* complain_on_overflow */
++	 complain_overflow_dont,     /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_SIMM5",	     /* name */
 +	 false,			     /* partial_inplace */
@@ -398,7 +398,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 21,			     /* bitsize */
 +	 true,			     /* pc_relative */
 +	 11,			     /* bitpos */
-+	 complain_overflow_signed,   /* complain_on_overflow */
++	 complain_overflow_dont,     /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_DISP21",	     /* name */
 +	 false,			     /* partial_inplace */
@@ -411,7 +411,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 5,			     /* bitsize */
 +	 false,			     /* pc_relative */
 +	 21,			     /* bitpos */
-+	 complain_overflow_signed,   /* complain_on_overflow */
++	 complain_overflow_dont,     /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_SHAMT",	     /* name */
 +	 false,			     /* partial_inplace */
@@ -424,7 +424,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 8,			     /* bitsize */
 +	 false,			     /* pc_relative */
 +	 0,			     /* bitpos */
-+	 complain_overflow_signed,   /* complain_on_overflow */
++	 complain_overflow_dont,     /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_ABS8",	     /* name */
 +	 false,			     /* partial_inplace */
@@ -437,7 +437,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 16,			     /* bitsize */
 +	 false,			     /* pc_relative */
 +	 0,			     /* bitpos */
-+	 complain_overflow_signed,   /* complain_on_overflow */
++	 complain_overflow_dont,     /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_ABS16",	     /* name */
 +	 false,			     /* partial_inplace */
@@ -450,7 +450,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 32,			     /* bitsize */
 +	 false,			     /* pc_relative */
 +	 0,			     /* bitpos */
-+	 complain_overflow_signed,   /* complain_on_overflow */
++	 complain_overflow_dont,     /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_ABS32",	     /* name */
 +	 false,			     /* partial_inplace */
@@ -463,7 +463,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 8,			     /* bitsize */
 +	 true,			     /* pc_relative */
 +	 0,			     /* bitpos */
-+	 complain_overflow_signed,   /* complain_on_overflow */
++	 complain_overflow_dont,     /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_PCREL8",	     /* name */
 +	 false,			     /* partial_inplace */
@@ -476,7 +476,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 16,			     /* bitsize */
 +	 true,			     /* pc_relative */
 +	 0,			     /* bitpos */
-+	 complain_overflow_signed,   /* complain_on_overflow */
++	 complain_overflow_dont,     /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_PCREL16",	     /* name */
 +	 false,			     /* partial_inplace */
@@ -489,7 +489,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 32,			     /* bitsize */
 +	 true,			     /* pc_relative */
 +	 0,			     /* bitpos */
-+	 complain_overflow_signed,   /* complain_on_overflow */
++	 complain_overflow_dont,     /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	     /* special_function */
 +	 "R_XR17032_PCREL32",	     /* name */
 +	 false,			     /* partial_inplace */
