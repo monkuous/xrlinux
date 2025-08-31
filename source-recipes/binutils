@@ -7,5 +7,5 @@ tarball_blake2b="0eb031ace9fb5a7047b81b5a05b1760f7d332c8ed67f98899f153a45f181b83
 hostdeps="autoconf-2.69 automake libtool"
 
 prepare() {
-    autotools_regen
+    autotools_regen "-I$PWD/config"
 }
