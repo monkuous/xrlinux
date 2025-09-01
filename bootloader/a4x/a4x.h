@@ -60,10 +60,10 @@ struct FwKeyboard {
 };
 
 enum FwMachineType : uint8_t {
-    XR_STATION,
-    XR_MP,
-    XR_FRAME,
-    XR_TYPE_MAX,
+    FW_XR_STATION,
+    FW_XR_MP,
+    FW_XR_FRAME,
+    FW_XR_TYPE_MAX,
 };
 
 struct FwDeviceDatabase {

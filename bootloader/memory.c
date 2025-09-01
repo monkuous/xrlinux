@@ -5,10 +5,7 @@
 
 struct HeapRange {
     struct BlListNode Node;
-    union {
-        struct BlListNode FreeNode;
-        size_t AllocAlignment;
-    };
+    struct BlListNode FreeNode;
     uintptr_t End;
     bool Free;
 };
@@ -66,6 +63,9 @@ void BlAddHeapRange(uintptr_t base, size_t size) {
 }
 
 void *BlAllocateHeap(size_t size, size_t alignment) {
+    //BlPrint("BlAllocateHeap(%zu,%zu)\n", size, alignment);
+    //BlDumpHeap();
+
     if (size == 0) return nullptr;
     if (alignment < HEAP_ALIGNMENT) alignment = HEAP_ALIGNMENT;
 
@@ -100,7 +100,6 @@ void *BlAllocateHeap(size_t size, size_t alignment) {
         }
 
         auto newRange = (struct HeapRange *)allocBase;
-        newRange->AllocAlignment = alignment;
         newRange->End = allocEnd;
         newRange->Free = false;
         BlListInsertAfter(&BlHeapRanges, &range->Node, &newRange->Node);
@@ -111,7 +110,14 @@ void *BlAllocateHeap(size_t size, size_t alignment) {
     BlCrash("out of memory");
 }
 
-void *BlResizeHeap(void *ptr, size_t newSize) {
+void *BlResizeHeap(void *ptr, size_t newSize, size_t alignment) {
+    if (!ptr) return BlAllocateHeap(newSize, alignment);
+
+    if (newSize == 0) {
+        BlFreeHeap(ptr);
+        return nullptr;
+    }
+
     newSize = ALIGN_UP(newSize, HEAP_ALIGNMENT);
 
     struct HeapRange *range = ptr - sizeof(*range);
@@ -153,13 +159,15 @@ void *BlResizeHeap(void *ptr, size_t newSize) {
         return ptr;
     }
 
-    void *newPtr = BlAllocateHeap(newSize, range->AllocAlignment);
+    void *newPtr = BlAllocateHeap(newSize, alignment);
     BlCopyMemory(newPtr, ptr, oldSize);
     BlFreeHeap(ptr);
     return newPtr;
 }
 
 void BlFreeHeap(void *ptr) {
+    if (!ptr) return;
+
     struct HeapRange *range = ptr - sizeof(*range);
 
     auto prev = BL_LIST_PREV(struct HeapRange, Node, *range);

@@ -50,3 +50,19 @@ USED void *memset(void *dest, int value, size_t count) {
 
     return dest;
 }
+
+USED int strcmp(const char *s1, const char *s2) {
+    while (true) {
+        int c1 = (unsigned char)*s1++;
+        int c2 = (unsigned char)*s2++;
+
+        int diff = c1 - c2;
+        if (diff != 0) return diff;
+    }
+}
+
+USED size_t strlen(const char *str) {
+    size_t length = 0;
+    while (*str++) length++;
+    return length;
+}

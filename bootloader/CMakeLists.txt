@@ -10,6 +10,7 @@ add_compile_options(-fdata-sections -ffunction-sections -Wall -Wextra)
 add_link_options(LINKER:--gc-sections LINKER:--sort-section=alignment)
 
 add_executable(bootloader
+        dt.c
         intrinsics.c
         logging.c
         memory.c
