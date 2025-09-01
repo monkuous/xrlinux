@@ -1,0 +1,20 @@
+#! /bin/sh
+
+name=bootloader
+version=0
+revision=1
+source_dir=bootloader
+hostdeps="binutils gcc-bootstrap"
+imagedeps="build-essential cmake ninja-build"
+
+configure() {
+    cmake_configure
+}
+
+build() {
+    cmake --build . -j"${parallelism}"
+}
+
+package() {
+    DESTDIR="${dest_dir}" cmake --install .
+}

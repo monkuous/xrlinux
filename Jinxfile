@@ -3,9 +3,17 @@
 JINX_MAJOR_VER=0.6
 
 TRIPLE="${JINX_ARCH}"-unknown-linux-gnu
-BUILD_TYPE="${JINX_BUILD_TYPE:-RelWithDebInfo}"
 
 autotools_regen() {
     find . '(' -name configure.ac -o -name configure.in ')' -type f -print0 \
             | sort -z | xargs -0 autoreconf -fvi "$@"
+}
+
+cmake_configure() {
+    cmake "${source_dir}"                                                                   \
+        -GNinja                                                                             \
+        -DCMAKE_TOOLCHAIN_FILE="${base_dir}/build-support/cmake-toolchain-${JINX_ARCH}.txt" \
+        -DCMAKE_INSTALL_PREFIX="${prefix}"                                                  \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo                                                   \
+        "$@"
 }
