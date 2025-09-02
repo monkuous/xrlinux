@@ -227,7 +227,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032-protos.h gcc-wor
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/gcc/config/xr17032/xr17032.cc
 --- gcc-clean/gcc/config/xr17032/xr17032.cc	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.cc
-@@ -0,0 +1,1319 @@
+@@ -0,0 +1,1286 @@
 +/* Target Code for XR/17032
 +   Copyright (C) 2025-2025 Free Softwa*re Foundation, Inc.
 +   Contributed by monkuous.
@@ -1270,7 +1270,8 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +
 +static rtx
 +xr17032_get_arg_info (struct xr17032_arg_info *info, const CUMULATIVE_ARGS *cum,
-+		      machine_mode mode, const_tree type, bool return_p)
++		      machine_mode mode, const_tree type, bool named,
++		      bool return_p)
 +{
 +  unsigned num_bytes, num_words;
 +  unsigned gpr_base = return_p ? XR17032_A3 : XR17032_A0;
@@ -1282,7 +1283,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +  num_bytes = type ? int_size_in_bytes (type) : GET_MODE_SIZE (mode);
 +  num_words = (num_bytes + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
 +
-+  if (!return_p && num_words > 2)
++  if (!named || (!return_p && num_words > 2))
 +    info->stack_p = true;
 +  else
 +    info->stack_p = num_words > MAX_ARGS_IN_REGISTERS - info->gpr_offset;
@@ -1325,7 +1326,8 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +    /* Return the calling convention that used by the current function. */
 +    return gen_int_mode (cum->variant_cc, SImode);
 +
-+  return xr17032_get_arg_info (&info, cum, arg.mode, arg.type, false);
++  return xr17032_get_arg_info (&info, cum, arg.mode, arg.type, arg.named,
++			       false);
 +}
 +
 +static void
@@ -1335,7 +1337,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +  CUMULATIVE_ARGS *cum = get_cumulative_args (cum_v);
 +  struct xr17032_arg_info info;
 +
-+  xr17032_get_arg_info (&info, cum, arg.mode, arg.type, false);
++  xr17032_get_arg_info (&info, cum, arg.mode, arg.type, arg.named, false);
 +
 +  cum->num_gprs = info.gpr_offset + info.num_gprs;
 +}
@@ -1367,7 +1369,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +  int unsigned_p = TYPE_UNSIGNED (type);
 +  mode = promote_function_mode (type, mode, &unsigned_p, func, 1);
 +
-+  return xr17032_get_arg_info (&info, &cum, mode, type, true);
++  return xr17032_get_arg_info (&info, &cum, mode, type, true, true);
 +}
 +
 +static rtx
@@ -1378,7 +1380,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +
 +  memset (&cum, 0, sizeof (cum));
 +
-+  return xr17032_get_arg_info (&info, &cum, mode, nullptr, true);
++  return xr17032_get_arg_info (&info, &cum, mode, nullptr, true, true);
 +}
 +
 +static bool
@@ -1399,7 +1401,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +  int unsigned_p = TYPE_UNSIGNED (type);
 +  mode = promote_function_mode (type, mode, &unsigned_p, func, 1);
 +
-+  xr17032_get_arg_info (&info, &cum, mode, type, true);
++  xr17032_get_arg_info (&info, &cum, mode, type, true, true);
 +
 +  return info.stack_p;
 +}
@@ -1441,39 +1443,6 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +    default:
 +      return false;
 +    }
-+}
-+
-+static void
-+xr17032_setup_incoming_varargs (cumulative_args_t cum,
-+			        const function_arg_info &arg,
-+			        int *pretend_size ATTRIBUTE_UNUSED, int no_rtl)
-+{
-+  CUMULATIVE_ARGS local_cum;
-+  int gp_saved;
-+
-+  /* The caller has advanced CUM up to, but not beyond, the last named
-+     argument.  Advance a local copy of CUM past the last "real" named
-+     argument, to find out how many registers are left over.  */
-+  local_cum = *get_cumulative_args (cum);
-+  if (!TYPE_NO_NAMED_ARGS_STDARG_P (TREE_TYPE (current_function_decl))
-+      || arg.type != NULL_TREE)
-+    xr17032_function_arg_advance (pack_cumulative_args (&local_cum), arg);
-+
-+  /* Found out how many registers we need to save.  */
-+  gp_saved = MAX_ARGS_IN_REGISTERS - local_cum.num_gprs;
-+
-+  if (!no_rtl && gp_saved > 0)
-+    {
-+      rtx ptr = plus_constant (Pmode, virtual_incoming_args_rtx,
-+			       -gp_saved * UNITS_PER_WORD);
-+      rtx mem = gen_frame_mem (BLKmode, ptr);
-+      set_mem_alias_set (mem, get_varargs_alias_set ());
-+
-+      move_block_from_reg (local_cum.num_gprs + XR17032_A0,
-+			   mem, gp_saved);
-+    }
-+
-+  cfun->machine->varargs_size = gp_saved * UNITS_PER_WORD;
 +}
 +
 +static void
@@ -1522,8 +1491,6 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +#undef TARGET_FRAME_POINTER_REQUIRED
 +#define TARGET_FRAME_POINTER_REQUIRED xr17032_frame_pointer_required
 +
-+#undef TARGET_SETUP_INCOMING_VARARGS
-+#define TARGET_SETUP_INCOMING_VARARGS xr17032_setup_incoming_varargs
 +#undef TARGET_EXPAND_BUILTIN_VA_START
 +#define TARGET_EXPAND_BUILTIN_VA_START xr17032_expand_builtin_va_start
 +#undef TARGET_MUST_PASS_IN_STACK
