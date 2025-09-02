@@ -43,6 +43,11 @@ BxStartup:
     mov long [t0 + 0x48], sp
     mov long [t0 + 0x4c], lr
     # jump to real entry point
+    mfcr t0, rs
+    mtcr rs, zero
+    lui sp, zero, .LstackTop
+    ori sp, sp, .LstackTop
+    mtcr rs, t0
     addi s0, zero, 0
     jal BxMain
     brk
@@ -86,3 +91,11 @@ BxReturnToFirmware:
 .type BxFirmwareRegisters, @object
 BxFirmwareRegisters: .space 0x50
 .size BxFirmwareRegisters, . - BxFirmwareRegisters
+
+.section ".bss.BxStack", "aw", %nobits
+
+.balign 4
+.type BxStack, @object
+BxStack: .space 0x1000
+.LstackTop:
+.size BxStack, . - BxStack

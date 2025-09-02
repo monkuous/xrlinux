@@ -1,0 +1,7 @@
+#pragma once
+
+#define BL_SECTOR_SHIFT 9
+#define BL_SECTOR_SIZE (1u << BL_SECTOR_SHIFT)
+#define BL_SECTOR_MASK (BL_SECTOR_SIZE - 1)
+
+#define BL_BCACHE_ALIGN BL_SECTOR_SIZE

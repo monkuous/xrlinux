@@ -11,9 +11,12 @@ add_link_options(LINKER:--gc-sections LINKER:--sort-section=alignment)
 
 add_executable(bootloader
         dt.c
+        filesystem.c
         intrinsics.c
         logging.c
+        main.c
         memory.c
+        partition.c
 )
 target_include_directories(bootloader PRIVATE .)
 target_compile_options(bootloader PRIVATE -ffreestanding)

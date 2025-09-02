@@ -115,6 +115,12 @@ static void BlPrintArgsToCallback(const char *format, va_list args, void (*fn)(u
         }
         case 'c': fn(va_arg(args, int), ctx); break;
         case 's': BiPrintString(va_arg(args, const char *), fn, ctx); break;
+        case 'S': {
+            const unsigned char *data = va_arg(args, const unsigned char *);
+            size_t count = va_arg(args, size_t);
+            while (count--) fn(*data++, ctx);
+            break;
+        }
         case 'p':
             fn('0', ctx);
             fn('x', ctx);
@@ -163,20 +169,20 @@ size_t BlPrintToBuffer(void *buffer, size_t size, const char *format, ...) {
 }
 
 struct BlPrintBufferData {
-    unsigned char *buffer;
-    unsigned char *end;
+    unsigned char *Buffer;
+    unsigned char *End;
 };
 
 static void BlPrintBufferCallback(unsigned char c, void *ptr) {
     struct BlPrintBufferData *ctx = ptr;
 
-    if (ctx->buffer < ctx->end) *ctx->buffer = c;
-    ctx->buffer += 1;
+    if (ctx->Buffer < ctx->End) *ctx->Buffer = c;
+    ctx->Buffer += 1;
 }
 
 size_t BlPrintArgsToBuffer(void *buffer, size_t size, const char *format, va_list args) {
     struct BlPrintBufferData data = {buffer, buffer + size};
     BlPrintArgsToCallback(format, args, BlPrintBufferCallback, &data);
     BlPrintBufferCallback(0, &data);
-    return (void *)data.buffer - buffer;
+    return (void *)data.Buffer - buffer;
 }

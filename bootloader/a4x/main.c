@@ -1,3 +1,4 @@
+#include "main.h"
 #include "a4x.h"
 #include "compiler.h"
 #include "dt.h"
@@ -36,6 +37,8 @@
 extern const char BxImageEnd[];
 
 static void BxAddMemoryRanges(struct FwDeviceDatabase *deviceDatabase) {
+    BlPrint("Initializing bootloader heap\n");
+
     uintptr_t minHeapAddr = (uintptr_t)&BxImageEnd;
 
     for (size_t i = 0; i < ARRAY_SIZE(deviceDatabase->RamBanks); i++) {
@@ -228,6 +231,8 @@ static void BxDtAddBoards(struct FwDeviceDatabase *deviceDatabase) {
 }
 
 static void BxDtPopulate(struct FwDeviceDatabase *deviceDatabase, char *args) {
+    BlPrint("Populating device tree\n");
+
     BlDtAddPropertyU32(nullptr, "#address-cells", 1);
     BlDtAddPropertyU32(nullptr, "#size-cells", 1);
     BlDtAddPropertyString(nullptr, "compatible", "xrarch,xrcomputer");
@@ -258,9 +263,12 @@ USED _Noreturn void BxMain(
 ) {
     BxApiTable = apiTable;
 
+    struct FwDisk *disk = &deviceDatabase->Disks[bootPartition->Id];
+    BxBootDisk = &disk->Partitions[ARRAY_SIZE(disk->Partitions) - 1];
+    ASSERT(BxBootDisk->BaseSector == 0);
+
     BxAddMemoryRanges(deviceDatabase);
     BxDtPopulate(deviceDatabase, args);
 
-    BlPrint("Built FDT at %p\n", BlDtBuildBlob());
-    BlCrash("TODO (%p, %p, %p, %s)", deviceDatabase, apiTable, bootPartition, args);
+    BlMain();
 }

@@ -18,6 +18,12 @@
         __typeof__(x) _y = (y); \
         _x & ~(_y - 1);         \
     })
+#define MIN(x, y)               \
+    ({                          \
+        __typeof__(x) _x = (x); \
+        __typeof__(y) _y = (y); \
+        _x <= _y ? _x : _y;     \
+    })
 #define CONTAINER(type, name, value)                            \
     ({                                                          \
         void *_ptr = (value);                                   \
@@ -68,6 +74,10 @@ extern _Noreturn void BlAssertionFailed(const char *expr, const char *file, int 
 #define ASSERT(x) (__builtin_expect(!!(x), 1) ? (void)0 : __builtin_unreachable())
 #endif
 
+static inline int BlCompareMemory(const void *s1, const void *s2, size_t count) {
+    return __builtin_memcmp(s1, s2, count);
+}
+
 static inline void BlCopyMemory(void *restrict dest, const void *restrict src, size_t count) {
     __builtin_memcpy(dest, src, count);
 }
@@ -86,4 +96,34 @@ static inline void BlFillMemory(void *dest, unsigned char value, size_t count) {
 
 static inline size_t BlStringLength(const char *str) {
     return __builtin_strlen(str);
+}
+
+static inline int BlCountTrailingZeroes(unsigned value) {
+    int count = 0;
+
+    if ((value & 0xffff) == 0) {
+        count += 16;
+        value >>= 16;
+    }
+
+    if ((value & 0xff) == 0) {
+        count += 8;
+        value >>= 8;
+    }
+
+    if ((value & 0xf) == 0) {
+        count += 4;
+        value >>= 4;
+    }
+
+    if ((value & 3) == 0) {
+        count += 2;
+        value >>= 2;
+    }
+
+    if ((value & 1) == 0) {
+        count += 1;
+    }
+
+    return count;
 }

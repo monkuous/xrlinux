@@ -144,6 +144,7 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < ARRAY_SIZE(mbr.PartitionRecord); i++) {
         struct MbrPartition *part = &mbr.PartitionRecord[i];
+        if (part->BootIndicator != 0 && part->BootIndicator != 0x80) ErrorDie("invalid mbr");
         if (part->OsType == 0 || part->SizeInLba == 0) continue;
         if (part->StartingLba < aptPartitionEnd) aptPartitionEnd = part->StartingLba;
     }

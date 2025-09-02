@@ -90,3 +90,4 @@ struct FwApiTable {
 };
 
 extern struct FwApiTable *BxApiTable;
+extern struct FwPartition *BxBootDisk;
