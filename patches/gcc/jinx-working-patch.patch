@@ -1517,7 +1517,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gcc/config/xr17032/xr17032.h
 --- gcc-clean/gcc/config/xr17032/xr17032.h	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.h
-@@ -0,0 +1,252 @@
+@@ -0,0 +1,251 @@
 +/* Target Definitions for XR/17032.
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +   Contributed by monkuous.
@@ -1766,7 +1766,6 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gc
 +#define SUM_OF_TWO_U16_ALGN(VALUE) \
 +  (((VALUE) >= ((IMM_REACH & ~3) + 1)) && ((VALUE) <= ((IMM_REACH & ~3) * 2)))
 +
-+#define SHIFT_COUNT_TRUNCATED 1
 +#define LOAD_EXTEND_OP(MODE) ZERO_EXTEND
 +
 +#endif /* GCC_XR17032_H */
