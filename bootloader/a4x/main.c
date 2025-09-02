@@ -89,7 +89,7 @@ static void BxDtAddChosen(char *args) {
     BlDtAddPropertyString(node, "bootargs", args);
 }
 
-static uint32_t BxCpuIrqcPhandles[ARRAY_SIZE(((struct FwDeviceDatabase *)0)->Processors)];
+static uint32_t BxCpuPhandles[ARRAY_SIZE(((struct FwDeviceDatabase *)0)->Processors)];
 static uint32_t BxLsicPhandle;
 static size_t BxNumCpus;
 
@@ -105,19 +105,16 @@ static void BxDtAddCpus(struct FwDeviceDatabase *deviceDatabase) {
         BlPrintToBuffer(buffer, sizeof(buffer), "cpu@%u", i);
 
         auto cpu = BlDtCreateNode(cpus, buffer);
+        auto phandle = BlDtAllocPhandle();
+        BlDtAddPropertyU32(cpu, "phandle", phandle);
         BlDtAddPropertyString(cpu, "device_type", "cpu");
         BlDtAddPropertyU32(cpu, "reg", i);
         BlDtAddPropertyString(cpu, "status", "okay");
         BlDtAddPropertyString(cpu, "compatible", "xrarch,xr17032");
+        BlDtAddProperty(cpu, "interrupt-controller", nullptr, 0);
+        BlDtAddPropertyU32(cpu, "#interrupt-cells", 1);
 
-        auto irqc = BlDtCreateNode(cpu, "interrupt-controller");
-        auto phandle = BlDtAllocPhandle();
-        BlDtAddPropertyU32(irqc, "phandle", phandle);
-        BlDtAddPropertyString(irqc, "compatible", "xrarch,xr17032-irqc");
-        BlDtAddProperty(irqc, "interrupt-controller", nullptr, 0);
-        BlDtAddPropertyU32(irqc, "#interrupt-cells", 1);
-
-        BxCpuIrqcPhandles[BxNumCpus++] = phandle;
+        BxCpuPhandles[BxNumCpus++] = phandle;
     }
 }
 
@@ -187,7 +184,7 @@ static void BxDtAddLsic(void) {
     auto data = BL_ALLOCATE(uint32_t, BxNumCpus * 2);
 
     for (size_t i = 0; i < BxNumCpus; i++) {
-        data[i * 2] = BxCpuIrqcPhandles[i];
+        data[i * 2] = BxCpuPhandles[i];
         data[i * 2 + 1] = BX_CPU_IRQ_INT;
     }
 
