@@ -1,5 +1,6 @@
 #include "partition.h"
 #include "compiler.h"
+#include "config.h"
 #include "filesystem.h"
 #include "logging.h"
 #include "platform.h"
@@ -106,9 +107,7 @@ void BlFindRootPartition(void) {
 
         auto file = BlFsFind("xrlinux.cfg");
         if (!file) continue;
-
-        // TODO: Load config from file
-
+        BlLoadConfigurationFromFile(file);
         BlFsFree(file);
         return;
     }
