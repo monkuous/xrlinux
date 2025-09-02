@@ -60,12 +60,12 @@ static void BxAddMemoryToDeviceTree(struct FwDeviceDatabase *deviceDatabase) {
 static void BxFillDeviceTree(struct FwDeviceDatabase *deviceDatabase) {
     BlDtAddPropertyU32(nullptr, "#address-cells", 1);
     BlDtAddPropertyU32(nullptr, "#size-cells", 1);
-    BlDtAddPropertyString(nullptr, "compatible", "xrcomputer");
+    BlDtAddPropertyString(nullptr, "compatible", "xrarch,xrcomputer");
 
     switch (deviceDatabase->MachineType) {
-    case FW_XR_STATION: BlDtAddPropertyString(nullptr, "model", "xrstation"); break;
-    case FW_XR_MP: BlDtAddPropertyString(nullptr, "model", "xrmp"); break;
-    case FW_XR_FRAME: BlDtAddPropertyString(nullptr, "model", "xrframe"); break;
+    case FW_XR_STATION: BlDtAddPropertyString(nullptr, "model", "XR/station"); break;
+    case FW_XR_MP: BlDtAddPropertyString(nullptr, "model", "XR/MP"); break;
+    case FW_XR_FRAME: BlDtAddPropertyString(nullptr, "model", "XR/frame"); break;
     default: BlCrash("unknown machine type"); break;
     }
 
