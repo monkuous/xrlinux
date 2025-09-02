@@ -58,6 +58,7 @@ USED int strcmp(const char *s1, const char *s2) {
 
         int diff = c1 - c2;
         if (diff != 0) return diff;
+        if (c1 == 0) return 0;
     }
 }
 
