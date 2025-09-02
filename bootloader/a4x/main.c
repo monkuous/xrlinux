@@ -6,6 +6,33 @@
 
 #define BX_RAM_BANK_INTERVAL 0x200'0000 // RAM banks are placed at 32M intervals
 
+#define BX_CPU_IRQ_INT 1
+
+#define BX_LSIC_BASE 0xf803'0000
+#define BX_LSIC_SIZE 0x100
+
+#define BX_RTC_BASE 0xf800'0080
+#define BX_RTC_SIZE 8
+#define BX_RTC_IRQ 2
+
+#define BX_SERIAL_COUNT 2
+#define BX_SERIAL_SIZE 8
+#define BX_SERIAL_BASE(n) (0xf800'0040 + (n) * BX_SERIAL_SIZE)
+#define BX_SERIAL_IRQ(n) (4 + (n))
+#define BX_SERIAL_BAUD 9600
+
+#define BX_DISKS_BASE 0xf800'0064
+#define BX_DISKS_SIZE 12
+#define BX_DISKS_IRQ 3
+
+#define BX_AMTSU_BASE 0xf800'00c0
+#define BX_AMTSU_SIZE 20
+#define BX_AMTSU_IRQ 0x30
+#define BX_AMTSU_NIRQ 4
+
+#define BX_BOARD_SIZE 0x800'0000
+#define BX_BOARD_IRQ(n) (0x28 + (n))
+
 extern const char BxImageEnd[];
 
 static void BxAddMemoryRanges(struct FwDeviceDatabase *deviceDatabase) {
@@ -25,7 +52,7 @@ static void BxAddMemoryRanges(struct FwDeviceDatabase *deviceDatabase) {
     }
 }
 
-static void BxEmitMemoryNode(size_t start, size_t end) {
+static void BxDtAddMemoryBank(size_t start, size_t end) {
     char buffer[32];
     BlPrintToBuffer(buffer, ARRAY_SIZE(buffer), "memory@%zx", start);
 
@@ -36,7 +63,7 @@ static void BxEmitMemoryNode(size_t start, size_t end) {
     BlDtAddPropertyU32s(node, "reg", reg, ARRAY_SIZE(reg));
 }
 
-static void BxAddMemoryToDeviceTree(struct FwDeviceDatabase *deviceDatabase) {
+static void BxDtAddMemory(struct FwDeviceDatabase *deviceDatabase) {
     size_t start = 0;
     size_t end = 0;
 
@@ -47,17 +74,163 @@ static void BxAddMemoryToDeviceTree(struct FwDeviceDatabase *deviceDatabase) {
         size_t base = i * BX_RAM_BANK_INTERVAL;
 
         if (base != end) {
-            if (start != end) BxEmitMemoryNode(start, end);
+            if (start != end) BxDtAddMemoryBank(start, end);
             start = base;
         }
 
         end = base + pages * 0x1000;
     }
 
-    if (start != end) BxEmitMemoryNode(start, end);
+    if (start != end) BxDtAddMemoryBank(start, end);
 }
 
-static void BxFillDeviceTree(struct FwDeviceDatabase *deviceDatabase) {
+static void BxDtAddChosen(char *args) {
+    auto node = BlDtCreateNode(nullptr, "chosen");
+    BlDtAddPropertyString(node, "bootargs", args);
+}
+
+static uint32_t BxCpuIrqcPhandles[ARRAY_SIZE(((struct FwDeviceDatabase *)0)->Processors)];
+static uint32_t BxLsicPhandle;
+static size_t BxNumCpus;
+
+static void BxDtAddCpus(struct FwDeviceDatabase *deviceDatabase) {
+    auto cpus = BlDtCreateNode(nullptr, "cpus");
+    BlDtAddPropertyU32(cpus, "#address-cells", 1);
+    BlDtAddPropertyU32(cpus, "#size-cells", 0);
+
+    for (size_t i = 0; i < ARRAY_SIZE(deviceDatabase->Processors); i++) {
+        if (!deviceDatabase->Processors[i].Present) continue;
+
+        char buffer[32];
+        BlPrintToBuffer(buffer, sizeof(buffer), "cpu@%u", i);
+
+        auto cpu = BlDtCreateNode(cpus, buffer);
+        BlDtAddPropertyString(cpu, "device_type", "cpu");
+        BlDtAddPropertyU32(cpu, "reg", i);
+        BlDtAddPropertyString(cpu, "status", "okay");
+        BlDtAddPropertyString(cpu, "compatible", "xrarch,xr17032");
+
+        auto irqc = BlDtCreateNode(cpu, "interrupt-controller");
+        auto phandle = BlDtAllocPhandle();
+        BlDtAddPropertyU32(irqc, "phandle", phandle);
+        BlDtAddPropertyString(irqc, "compatible", "xrarch,xr17032-irqc");
+        BlDtAddProperty(irqc, "interrupt-controller", nullptr, 0);
+        BlDtAddPropertyU32(irqc, "#interrupt-cells", 1);
+
+        BxCpuIrqcPhandles[BxNumCpus++] = phandle;
+    }
+}
+
+static void BxDtAddInterrupts(struct BlDtNode *node, uint32_t base, uint32_t count) {
+    BlDtAddPropertyU32(node, "interrupt-parent", BxLsicPhandle);
+
+    if (count == 1) {
+        BlDtAddPropertyU32(node, "interrupts", base);
+        return;
+    }
+
+    auto data = BL_ALLOCATE(uint32_t, count);
+
+    for (size_t i = 0; i < count; i++) {
+        data[i] = base + i;
+    }
+
+    BlDtAddPropertyU32s(node, "interrupts", data, count);
+
+    BlFreeHeap(data);
+}
+
+static struct BlDtNode *BxDtAddDevice(
+    const char *name,
+    const char *cid,
+    size_t address,
+    size_t size,
+    uint32_t irq,
+    uint32_t nirq
+) {
+    char buffer[32];
+    BlPrintToBuffer(buffer, sizeof(buffer), "%s@%zx", name, address);
+
+    auto node = BlDtCreateNode(nullptr, buffer);
+    uint32_t reg[] = {address, size};
+
+    BlDtAddPropertyU32s(node, "reg", reg, ARRAY_SIZE(reg));
+    BlDtAddPropertyString(node, "compatible", cid);
+    BxDtAddInterrupts(node, irq, nirq);
+
+    return node;
+}
+
+static void BxDtAddRtc(void) {
+    BxDtAddDevice("rtc", "xrarch,rtc", BX_RTC_BASE, BX_RTC_SIZE, BX_RTC_IRQ, 1);
+}
+
+static void BxDtAddSerial(void) {
+    for (size_t i = 0; i < BX_SERIAL_COUNT; i++) {
+        auto node = BxDtAddDevice("serial", "xrarch,serial", BX_SERIAL_BASE(i), BX_SERIAL_SIZE, BX_SERIAL_IRQ(i), 1);
+        BlDtAddPropertyU32(node, "clock-frequency", BX_SERIAL_BAUD);
+        BlDtAddPropertyU32(node, "current-speed", BX_SERIAL_BAUD);
+    }
+}
+
+static void BxDtAddDisks(void) {
+    BxDtAddDevice("disk-controller", "xrarch,disk-controller", BX_DISKS_BASE, BX_DISKS_SIZE, BX_DISKS_IRQ, 1);
+}
+
+static void BxDtAddAmtsu(void) {
+    BxDtAddDevice("amtsu", "xrarch,amtsu", BX_AMTSU_BASE, BX_AMTSU_SIZE, BX_AMTSU_IRQ, BX_AMTSU_NIRQ);
+}
+
+static void BxDtAddLsic(void) {
+    BxLsicPhandle = BlDtAllocPhandle();
+
+    auto data = BL_ALLOCATE(uint32_t, BxNumCpus * 2);
+
+    for (size_t i = 0; i < BxNumCpus; i++) {
+        data[i * 2] = BxCpuIrqcPhandles[i];
+        data[i * 2 + 1] = BX_CPU_IRQ_INT;
+    }
+
+    char buffer[32];
+    BlPrintToBuffer(buffer, sizeof(buffer), "lsic@%zx", (size_t)BX_LSIC_BASE);
+
+    auto node = BlDtCreateNode(nullptr, buffer);
+    uint32_t reg[] = {BX_LSIC_BASE, BX_LSIC_SIZE};
+
+    BlDtAddPropertyU32(node, "phandle", BxLsicPhandle);
+    BlDtAddPropertyU32s(node, "reg", reg, ARRAY_SIZE(reg));
+    BlDtAddPropertyString(node, "compatible", "xrarch,lsic");
+    BlDtAddPropertyU32s(node, "interrupts-extended", data, BxNumCpus * 2);
+    BlDtAddProperty(node, "interrupt-controller", nullptr, 0);
+    BlDtAddPropertyU32(node, "#interrupt-cells", 1);
+
+    BlFreeHeap(data);
+}
+
+static void BxDtAddBoards(struct FwDeviceDatabase *deviceDatabase) {
+    for (size_t i = 0; i < ARRAY_SIZE(deviceDatabase->Boards); i++) {
+        struct FwBoard *board = &deviceDatabase->Boards[i];
+        if (!board->BoardId) continue;
+
+        char buffer[32];
+        BlPrintToBuffer(buffer, sizeof(buffer), "xrarch,expansion-%zx", board->BoardId);
+
+        auto node = BxDtAddDevice(
+            "expansion-board",
+            buffer,
+            (uintptr_t)board->Address,
+            BX_BOARD_SIZE,
+            BX_BOARD_IRQ(i),
+            1
+        );
+
+        if (board->Name[0]) {
+            BlDtAddPropertyString(node, "model", board->Name);
+        }
+    }
+}
+
+static void BxDtPopulate(struct FwDeviceDatabase *deviceDatabase, char *args) {
     BlDtAddPropertyU32(nullptr, "#address-cells", 1);
     BlDtAddPropertyU32(nullptr, "#size-cells", 1);
     BlDtAddPropertyString(nullptr, "compatible", "xrarch,xrcomputer");
@@ -69,7 +242,15 @@ static void BxFillDeviceTree(struct FwDeviceDatabase *deviceDatabase) {
     default: BlCrash("unknown machine type"); break;
     }
 
-    BxAddMemoryToDeviceTree(deviceDatabase);
+    BxDtAddMemory(deviceDatabase);
+    BxDtAddChosen(args);
+    BxDtAddCpus(deviceDatabase);
+    BxDtAddLsic();
+    BxDtAddRtc();
+    BxDtAddSerial();
+    BxDtAddDisks();
+    BxDtAddAmtsu();
+    BxDtAddBoards(deviceDatabase);
 }
 
 USED _Noreturn void BxMain(
@@ -81,7 +262,7 @@ USED _Noreturn void BxMain(
     BxApiTable = apiTable;
 
     BxAddMemoryRanges(deviceDatabase);
-    BxFillDeviceTree(deviceDatabase);
+    BxDtPopulate(deviceDatabase, args);
 
     BlPrint("Built FDT at %p\n", BlDtBuildBlob());
     BlCrash("TODO (%p, %p, %p, %s)", deviceDatabase, apiTable, bootPartition, args);

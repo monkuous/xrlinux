@@ -1,4 +1,5 @@
 #include "dt.h"
+#include "asm.h"
 #include "list.h"
 #include "memory.h"
 #include <stddef.h>
@@ -177,6 +178,11 @@ void BlDtAddPropertyStrings(struct BlDtNode *parent, const char *name, const cha
     BlDtDoAddProperty(parent, name, buffer, size);
 }
 
+uint32_t BlDtAllocPhandle(void) {
+    static uint32_t next;
+    return ++next;
+}
+
 struct BlFdtHeader {
     uint32_t Magic;
     uint32_t TotalSize;
@@ -242,7 +248,7 @@ void *BlDtBuildBlob(void) {
     header->OffMemRsvmap = BE32(sizeof(*header));
     header->Version = BE32(BL_FDT_VERSION);
     header->LastCompVersion = BE32(BL_FDT_COMP_VERSION);
-    header->BootCpuidPhys = BE32(0);
+    header->BootCpuidPhys = BE32(BlReadWhami());
     header->SizeDtStrings = BE32(BlDtStringsSize);
     header->SizeDtStruct = BE32(BlDtStructureSize);
 
