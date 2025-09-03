@@ -10,8 +10,7 @@ PHDRS {
 SECTIONS {
     . = 0x3000;
     .header : { KEEP(*(.header)) } :header
-    .entry  : { *(.entrypoint) *(.transition) } :text
-    .text   : { *(.text .text.*) } :text
+    .text   : { *(.entrypoint) *(.text .text.*) } :text
     .rodata : { *(.rodata .rodata.*) } :rodata
     .data   : { *(.data .data.*) } :data
     . = ALIGN(4);
@@ -22,7 +21,6 @@ SECTIONS {
     BxImageEnd = .;
 
     ASSERT(BxStartup == 0x3004, "invalid address for entrypoint")
-    ASSERT(ADDR(.text) < 0x4000, "entry section too large") /* the section containing .transition must be 1 page */
     ASSERT(BxBssSize % 4 == 0, ".bss size is not a multiple of 4")
 
     /DISCARD/ : { *(.note* .eh_frame*) }

@@ -89,5 +89,6 @@ struct FwApiTable {
     void (*KickProcessor)(size_t number, void *context, void (*callback)(size_t number, void *context));
 };
 
+extern struct FwDeviceDatabase *BxDeviceDatabase;
 extern struct FwApiTable *BxApiTable;
 extern struct FwPartition *BxBootDisk;

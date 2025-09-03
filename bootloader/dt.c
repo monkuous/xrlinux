@@ -1,6 +1,7 @@
 #include "dt.h"
 #include "asm.h"
 #include "list.h"
+#include "logging.h"
 #include "memory.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -233,6 +234,8 @@ static void BlDtAddToken(void *structure, size_t *offset, uint32_t token) {
 }
 
 void *BlDtBuildBlob(void) {
+    BlPrint("Creating device tree blob\n");
+
     size_t rsvMapSize = (BlDtRsvMemCount + 1) * sizeof(struct BlFdtRsvmapEntry);
     size_t totalSize = sizeof(struct BlFdtHeader) + rsvMapSize + BlDtStructureSize + BlDtStringsSize;
 

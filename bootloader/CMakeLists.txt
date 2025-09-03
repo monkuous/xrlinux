@@ -18,6 +18,7 @@ add_executable(bootloader
         main.c
         memory.c
         partition.c
+        transition.S
 )
 target_include_directories(bootloader PRIVATE .)
 target_compile_options(bootloader PRIVATE -ffreestanding)

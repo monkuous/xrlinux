@@ -4,6 +4,7 @@
 #include "dt.h"
 #include "logging.h"
 #include "memory.h"
+#include "platform.h"
 
 #define BX_RAM_BANK_INTERVAL 0x200'0000 // RAM banks are placed at 32M intervals
 
@@ -36,13 +37,13 @@
 
 extern const char BxImageEnd[];
 
-static void BxAddMemoryRanges(struct FwDeviceDatabase *deviceDatabase) {
+static void BxAddMemoryRanges(void) {
     BlPrint("Initializing bootloader heap\n");
 
     uintptr_t minHeapAddr = (uintptr_t)&BxImageEnd;
 
-    for (size_t i = 0; i < ARRAY_SIZE(deviceDatabase->RamBanks); i++) {
-        size_t pages = deviceDatabase->RamBanks[i].PageFrameCount;
+    for (size_t i = 0; i < ARRAY_SIZE(BxDeviceDatabase->RamBanks); i++) {
+        size_t pages = BxDeviceDatabase->RamBanks[i].PageFrameCount;
         if (!pages) continue;
 
         uintptr_t base = i * BX_RAM_BANK_INTERVAL;
@@ -66,12 +67,12 @@ static void BxDtAddMemoryBank(size_t start, size_t end) {
     BlDtAddPropertyU32s(node, "reg", reg, ARRAY_SIZE(reg));
 }
 
-static void BxDtAddMemory(struct FwDeviceDatabase *deviceDatabase) {
+static void BxDtAddMemory(void) {
     size_t start = 0;
     size_t end = 0;
 
-    for (size_t i = 0; i < ARRAY_SIZE(deviceDatabase->RamBanks); i++) {
-        size_t pages = deviceDatabase->RamBanks[i].PageFrameCount;
+    for (size_t i = 0; i < ARRAY_SIZE(BxDeviceDatabase->RamBanks); i++) {
+        size_t pages = BxDeviceDatabase->RamBanks[i].PageFrameCount;
         if (!pages) continue;
 
         size_t base = i * BX_RAM_BANK_INTERVAL;
@@ -94,15 +95,14 @@ static void BxDtAddChosen(char *args) {
 
 static uint32_t BxCpuPhandles[ARRAY_SIZE(((struct FwDeviceDatabase *)0)->Processors)];
 static uint32_t BxLsicPhandle;
-static size_t BxNumCpus;
 
-static void BxDtAddCpus(struct FwDeviceDatabase *deviceDatabase) {
+static void BxDtAddCpus(void) {
     auto cpus = BlDtCreateNode(nullptr, "cpus");
     BlDtAddPropertyU32(cpus, "#address-cells", 1);
     BlDtAddPropertyU32(cpus, "#size-cells", 0);
 
-    for (size_t i = 0; i < ARRAY_SIZE(deviceDatabase->Processors); i++) {
-        if (!deviceDatabase->Processors[i].Present) continue;
+    for (size_t i = 0; i < ARRAY_SIZE(BxDeviceDatabase->Processors); i++) {
+        if (!BxDeviceDatabase->Processors[i].Present) continue;
 
         char buffer[32];
         BlPrintToBuffer(buffer, sizeof(buffer), "cpu@%u", i);
@@ -207,9 +207,9 @@ static void BxDtAddLsic(void) {
     BlFreeHeap(data);
 }
 
-static void BxDtAddBoards(struct FwDeviceDatabase *deviceDatabase) {
-    for (size_t i = 0; i < ARRAY_SIZE(deviceDatabase->Boards); i++) {
-        struct FwBoard *board = &deviceDatabase->Boards[i];
+static void BxDtAddBoards(void) {
+    for (size_t i = 0; i < ARRAY_SIZE(BxDeviceDatabase->Boards); i++) {
+        struct FwBoard *board = &BxDeviceDatabase->Boards[i];
         if (!board->BoardId) continue;
 
         char buffer[32];
@@ -230,29 +230,29 @@ static void BxDtAddBoards(struct FwDeviceDatabase *deviceDatabase) {
     }
 }
 
-static void BxDtPopulate(struct FwDeviceDatabase *deviceDatabase, char *args) {
+static void BxDtPopulate(char *args) {
     BlPrint("Populating device tree\n");
 
     BlDtAddPropertyU32(nullptr, "#address-cells", 1);
     BlDtAddPropertyU32(nullptr, "#size-cells", 1);
     BlDtAddPropertyString(nullptr, "compatible", "xrarch,xrcomputer");
 
-    switch (deviceDatabase->MachineType) {
+    switch (BxDeviceDatabase->MachineType) {
     case FW_XR_STATION: BlDtAddPropertyString(nullptr, "model", "XR/station"); break;
     case FW_XR_MP: BlDtAddPropertyString(nullptr, "model", "XR/MP"); break;
     case FW_XR_FRAME: BlDtAddPropertyString(nullptr, "model", "XR/frame"); break;
     default: BlCrash("unknown machine type"); break;
     }
 
-    BxDtAddMemory(deviceDatabase);
+    BxDtAddMemory();
     BxDtAddChosen(args);
-    BxDtAddCpus(deviceDatabase);
+    BxDtAddCpus();
     BxDtAddLsic();
     BxDtAddRtc();
     BxDtAddSerial();
     BxDtAddDisks();
     BxDtAddAmtsu();
-    BxDtAddBoards(deviceDatabase);
+    BxDtAddBoards();
 }
 
 USED _Noreturn void BxMain(
@@ -261,14 +261,15 @@ USED _Noreturn void BxMain(
     struct FwPartition *bootPartition,
     char *args
 ) {
+    BxDeviceDatabase = deviceDatabase;
     BxApiTable = apiTable;
 
     struct FwDisk *disk = &deviceDatabase->Disks[bootPartition->Id];
     BxBootDisk = &disk->Partitions[ARRAY_SIZE(disk->Partitions) - 1];
     ASSERT(BxBootDisk->BaseSector == 0);
 
-    BxAddMemoryRanges(deviceDatabase);
-    BxDtPopulate(deviceDatabase, args);
+    BxAddMemoryRanges();
+    BxDtPopulate(args);
 
     BlMain();
 }
