@@ -1522,7 +1522,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gcc/config/xr17032/xr17032.h
 --- gcc-clean/gcc/config/xr17032/xr17032.h	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.h
-@@ -0,0 +1,252 @@
+@@ -0,0 +1,261 @@
 +/* Target Definitions for XR/17032.
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +   Contributed by monkuous.
@@ -1774,11 +1774,20 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gc
 +#define SHIFT_COUNT_TRUNCATED 1
 +#define LOAD_EXTEND_OP(MODE) ZERO_EXTEND
 +
++#define PROMOTE_MODE(MODE, UNSIGNEDP, TYPE)     \
++  if (GET_MODE_CLASS (MODE) == MODE_INT         \
++      && GET_MODE_SIZE (MODE) < UNITS_PER_WORD) \
++    {                                           \
++      if ((MODE) == SImode)                     \
++        (UNSIGNEDP) = 1;                        \
++      (MODE) = word_mode;                       \
++    }
++
 +#endif /* GCC_XR17032_H */
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/gcc/config/xr17032/xr17032.md
 --- gcc-clean/gcc/config/xr17032/xr17032.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.md
-@@ -0,0 +1,704 @@
+@@ -0,0 +1,739 @@
 +;; Machine description for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -1867,6 +1876,17 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +	(match_operand:MEMORY 1 ""))]
 +  ""
 +{
++  if (GET_MODE_CLASS (<MODE>mode) == MODE_INT
++      && GET_MODE_SIZE (<MODE>mode) < UNITS_PER_WORD
++      && !(reload_in_progress || reload_completed)
++      && MEM_P (operands[1]))
++    {
++      rtx temp_reg = gen_reg_rtx (SImode);
++      emit_insn (gen_extend_insn (temp_reg, operands[1], SImode, <MODE>mode,
++				  1));
++      operands[1] = gen_lowpart (<MODE>mode, temp_reg);
++    }
++
 +  if (!xr17032_move_operand (operands[1], <MODE>mode))
 +    {
 +      rtx reg;
@@ -2313,19 +2333,43 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +  "add\t%0,zero,%1 LSH 16\;add\t%0,zero,%0 ASH 16"
 +  [(set (attr "length") (const_int 8))])
 +
-+(define_insn "zero_extendqi<mode>2"
++(define_expand "zero_extendqi<mode>2"
++  [(set (match_operand:HISI                 0 "register_operand"     "=r")
++	(zero_extend:HISI (match_operand:QI 1 "nonimmediate_operand" " rm")))]
++  ""
++  "")
++
++(define_insn "*reg_zero_extendqi<mode>2"
 +  [(set (match_operand:HISI                 0 "register_operand" "=r")
 +	(zero_extend:HISI (match_operand:QI 1 "register_operand" " r")))]
 +  ""
 +  "add\t%0,zero,%1 LSH 24\;add\t%0,zero,%0 RSH 24"
 +  [(set (attr "length") (const_int 8))])
 +
-+(define_insn "zero_extendhisi2"
++(define_insn "*mem_zero_extendqi<mode>2"
++  [(set (match_operand:HISI                 0 "register_operand" "=r")
++	(zero_extend:HISI (match_operand:QI 1 "memory_operand"   " m")))]
++  ""
++  "mov\t%0,%1")
++
++(define_expand "zero_extendhisi2"
++  [(set (match_operand:SI                 0 "register_operand"     "=r")
++	(zero_extend:SI (match_operand:HI 1 "nonimmediate_operand" " rm")))]
++  ""
++  "")
++
++(define_insn "*reg_zero_extendhisi2"
 +  [(set (match_operand:SI                 0 "register_operand" "=r")
 +	(zero_extend:SI (match_operand:HI 1 "register_operand" " r")))]
 +  ""
 +  "add\t%0,zero,%1 LSH 16\;add\t%0,zero,%0 RSH 16"
 +  [(set (attr "length") (const_int 8))])
++
++(define_insn "*mem_zero_extendhisi2"
++  [(set (match_operand:SI                 0 "register_operand" "=r")
++	(zero_extend:SI (match_operand:HI 1 "memory_operand"   " m")))]
++  ""
++  "mov\t%0,%1")
 +
 +;; -------------------------------------------------------------------------
 +;; atomics
