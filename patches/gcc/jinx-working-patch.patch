@@ -66,7 +66,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/constraints.md gcc-workd
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/predicates.md gcc-workdir/gcc/config/xr17032/predicates.md
 --- gcc-clean/gcc/config/xr17032/predicates.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/predicates.md
-@@ -0,0 +1,114 @@
+@@ -0,0 +1,119 @@
 +;; Predicate description for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -181,6 +181,11 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/predicates.md gcc-workdi
 +  (ior (match_operand 0 "register_operand")
 +       (and (match_code "const_int")
 +	    (match_test "(unsigned HOST_WIDE_INT) INTVAL (op) < 32"))))
++
++(define_predicate "xr17032_call_operand"
++  (ior (match_operand 0 "register_operand")
++       (match_operand 0 "xr17032_absolute_symbolic_operand")
++       (match_operand 0 "xr17032_pcrel_symbolic_operand")))
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032-protos.h gcc-workdir/gcc/config/xr17032/xr17032-protos.h
 --- gcc-clean/gcc/config/xr17032/xr17032-protos.h	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032-protos.h
@@ -1773,7 +1778,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gc
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/gcc/config/xr17032/xr17032.md
 --- gcc-clean/gcc/config/xr17032/xr17032.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.md
-@@ -0,0 +1,706 @@
+@@ -0,0 +1,710 @@
 +;; Machine description for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -2144,12 +2149,14 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +  ""
 +{
 +  rtx target = XEXP (operands[0], 0);
++  if (!xr17032_call_operand (target, VOIDmode))
++    target = force_reg (SImode, target);
 +  emit_call_insn (gen_xr17032_call (target, operands[1]));
 +  DONE;
 +})
 +
 +(define_insn "xr17032_call"
-+  [(call (mem:SI (match_operand 0 "" "r,S,R"))
++  [(call (mem:SI (match_operand 0 "xr17032_call_operand" "r,S,R"))
 +	 (match_operand 1 "" ""))
 +   (clobber (reg:SI 31))]
 +  ""
@@ -2168,13 +2175,15 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +  ""
 +{
 +  rtx target = XEXP (operands[1], 0);
++  if (!xr17032_call_operand (target, VOIDmode))
++    target = force_reg (SImode, target);
 +  emit_call_insn (gen_xr17032_call_value (operands[0], target, operands[2]));
 +  DONE;
 +})
 +
 +(define_insn "xr17032_call_value"
 +  [(set (match_operand 0 "" "")
-+        (call (mem:SI (match_operand 1 "" "r,S,R"))
++        (call (mem:SI (match_operand 1 "xr17032_call_operand" "r,S,R"))
 +	      (match_operand 2 "" "")))
 +   (clobber (reg:SI 31))]
 +  ""
