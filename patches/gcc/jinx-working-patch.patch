@@ -1778,7 +1778,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gc
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/gcc/config/xr17032/xr17032.md
 --- gcc-clean/gcc/config/xr17032/xr17032.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.md
-@@ -0,0 +1,710 @@
+@@ -0,0 +1,704 @@
 +;; Machine description for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -2202,12 +2202,10 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +(define_code_iterator cond [eq ne lt gt ge le])
 +
 +(define_expand "cstoresi4"
-+  [(set (match_operand:SI                  0 "register_operand")
-+	(if_then_else (match_operator      1 "xr17032_slt_operator"
++  [(set (match_operand:SI    0 "register_operand")
++	(match_operator:SI   1 "xr17032_slt_operator"
 +			[(match_operand:SI 2 "xr17032_reg_or_0_operand")
-+			 (match_operand:SI 3 "")])
-+		      (const_int 1)
-+		      (const_int 0)))]
++			 (match_operand:SI 3 "")]))]
 +  ""
 +{
 +  if (GET_CODE (operands[1]) == LTU
@@ -2219,11 +2217,9 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +})
 +
 +(define_insn "xr17032_sltu"
-+  [(set (match_operand:SI                    0 "register_operand"         "=r,r,r,r")
-+        (if_then_else (ltu (match_operand:SI 1 "xr17032_reg_or_0_operand" " r,r,O,O")
-+			   (match_operand:SI 2 "xr17032_arith_operand"    " r,I,r,I"))
-+		      (const_int 1)
-+		      (const_int 0)))]
++  [(set (match_operand:SI         0 "register_operand"         "=r,r,r,r")
++        (ltu:SI (match_operand:SI 1 "xr17032_reg_or_0_operand" " r,r,O,O")
++		(match_operand:SI 2 "xr17032_arith_operand"    " r,I,r,I")))]
 +  ""
 +  "@
 +   slt\t%0,%1,%2
@@ -2232,11 +2228,9 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +   slti\t%0,zero,%2")
 +
 +(define_insn "xr17032_slt"
-+  [(set (match_operand:SI                   0 "register_operand"             "=r,r,r,r")
-+        (if_then_else (lt (match_operand:SI 1 "xr17032_reg_or_0_operand"     " r,r,O,O")
-+			  (match_operand:SI 2 "xr17032_arith_operand_signed" " r,J,r,J"))
-+		      (const_int 1)
-+		      (const_int 0)))]
++  [(set (match_operand:SI        0 "register_operand"             "=r,r,r,r")
++	(lt:SI (match_operand:SI 1 "xr17032_reg_or_0_operand"     " r,r,O,O")
++	       (match_operand:SI 2 "xr17032_arith_operand_signed" " r,J,r,J")))]
 +  ""
 +  "@
 +   slt signed\t%0,%1,%2
@@ -2246,7 +2240,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +
 +(define_expand "cbranchsi4"
 +  [(set (pc)
-+	(if_then_else (match_operator 0 "ordered_comparison_operator"
++	(if_then_else (match_operator      0 "ordered_comparison_operator"
 +			[(match_operand:SI 1 "xr17032_reg_or_0_operand")
 +			 (match_operand:SI 2 "xr17032_arith_operand")])
 +		      (label_ref (match_operand 3 ""))
