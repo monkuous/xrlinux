@@ -1,3 +1,12 @@
+diff -urN --no-dereference linux-clean/arch/xr17032/Kbuild linux-workdir/arch/xr17032/Kbuild
+--- linux-clean/arch/xr17032/Kbuild	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/Kbuild
+@@ -0,0 +1,5 @@
++# SPDX-License-Identifier: GPL-2.0-only
++
++obj-y += kernel/ mm/
++
++subdir- += boot/
 diff -urN --no-dereference linux-clean/arch/xr17032/Kconfig linux-workdir/arch/xr17032/Kconfig
 --- linux-clean/arch/xr17032/Kconfig	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/Kconfig
@@ -36,7 +45,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/Kconfig.debug linux-workdir/
 diff -urN --no-dereference linux-clean/arch/xr17032/Makefile linux-workdir/arch/xr17032/Makefile
 --- linux-clean/arch/xr17032/Makefile	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/Makefile
-@@ -0,0 +1,20 @@
+@@ -0,0 +1,36 @@
 +# This file is included by the global makefile so that you can add your own
 +# architecture-specific flags and dependencies.
 +#
@@ -45,18 +54,62 @@ diff -urN --no-dereference linux-clean/arch/xr17032/Makefile linux-workdir/arch/
 +# for more details.
 +#
 +
-+KBUILD_DEFCONFIG := xr17032_defconfig
++KBUILD_DEFCONFIG	:= xr17032_defconfig
 +
-+UTS_MACHINE := xr17032
++UTS_MACHINE	:= xr17032
 +
-+KBUILD_CFLAGS += -fno-pic
++KBUILD_CFLAGS	+= -fno-pic
 +
-+head-y := arch/xr17032/kernel/head.o
++libs-y		+= arch/xr17032/lib/
 +
-+core-y += arch/xr17032/kernel/
-+core-y += arch/xr17032/mm/
++boot		:= arch/xr17032/boot
++KBUILD_IMAGE	:= $(boot)/Image
 +
-+libs-y += arch/xr17032/lib/
++BOOT_TARGETS	:= Image
++
++$(BOOT_TARGETS): vmlinux
++	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
++	@$(kecho) '  Kernel: $(boot)/$@ is ready'
++
++all: $(notdir $(KBUILD_IMAGE))
++
++install:
++	$(call cmd,install)
++
++define archhelp
++  echo  '  Image	- Uncompressed kernel image (arch/xr17032/boot/Image)'
++  echo  '  install	- Install kernel using (your) ~/bin/$(INSTALLKERNEL) or'
++  echo  '		  (distribution) /sbin/$(INSTALLKERNEL) or install to '
++  echo  '		  $$(INSTALL_PATH)'
++endef
+diff -urN --no-dereference linux-clean/arch/xr17032/boot/Makefile linux-workdir/arch/xr17032/boot/Makefile
+--- linux-clean/arch/xr17032/boot/Makefile	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/boot/Makefile
+@@ -0,0 +1,24 @@
++#
++# arch/riscv/boot/Makefile
++#
++# This file is included by the global makefile so that you can add your own
++# architecture-specific flags and dependencies.
++#
++# This file is subject to the terms and conditions of the GNU General Public
++# License.  See the file "COPYING" in the main directory of this archive
++# for more details.
++#
++# Copyright (C) 2025, monkuous.
++# Author: monkuous
++#
++
++OBJCOPYFLAGS_Image := -O binary -R .note -R .note.gnu.build-id -R .comment -S
++
++targets := Image
++
++ifdef CONFIG_RELOCATABLE
++$(obj)/Image: vmlinux.unstripped FORCE
++else
++$(obj)/Image: vmlinux FORCE
++endif
++	$(call if_changed,objcopy)
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/Kbuild linux-workdir/arch/xr17032/include/asm/Kbuild
 --- linux-clean/arch/xr17032/include/asm/Kbuild	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/Kbuild
@@ -1720,16 +1773,17 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/uapi/asm/sigcontext.
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/Makefile linux-workdir/arch/xr17032/kernel/Makefile
 --- linux-clean/arch/xr17032/kernel/Makefile	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/Makefile
-@@ -0,0 +1,9 @@
+@@ -0,0 +1,10 @@
 +# SPDX-License-Identifier: GPL-2.0-only
 +#
 +# Makefile for the XR/17032 Linux kernel
 +#
 +
-+always-$(KBUILD_BUILTIN) += vmlinux.lds
++always-$(KBUILD_BUILTIN)	+= vmlinux.lds
 +
-+obj-y += asm-stubs.o
-+obj-y += stubs.o
++obj-y	+= head.o
++obj-y	+= asm-stubs.o
++obj-y	+= stubs.o
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/asm-offsets.c linux-workdir/arch/xr17032/kernel/asm-offsets.c
 --- linux-clean/arch/xr17032/kernel/asm-offsets.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/asm-offsets.c
@@ -1783,6 +1837,32 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/asm-stubs.S linux-wor
 +SYM_FUNC_START(__switch_to)
 +	brk
 +SYM_FUNC_END(__switch_to)
+diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/arch/xr17032/kernel/head.S
+--- linux-clean/arch/xr17032/kernel/head.S	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/kernel/head.S
+@@ -0,0 +1,22 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2025 monkuous
++ */
++
++#include <linux/init.h>
++#include <linux/linkage.h>
++
++__HEAD
++
++SYM_DATA_START_LOCAL(xrlinux_header)
++	.long 0x584c5258		# magic
++	.word 0				# minor version
++	.word 0				# major version
++	.long _start - xrlinux_header	# entrypoint
++	.long _end - xrlinux_header	# size in memory
++SYM_DATA_END(xrlinux_header)
++
++SYM_CODE_START(_start)
++1:	hlt
++	beq zero, 1b
++SYM_CODE_END(_start)
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/stubs.c linux-workdir/arch/xr17032/kernel/stubs.c
 --- linux-clean/arch/xr17032/kernel/stubs.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/stubs.c
