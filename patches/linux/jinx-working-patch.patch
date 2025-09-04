@@ -1,7 +1,7 @@
 diff -urN --no-dereference linux-clean/arch/xr17032/Kconfig linux-workdir/arch/xr17032/Kconfig
 --- linux-clean/arch/xr17032/Kconfig	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/Kconfig
-@@ -0,0 +1,18 @@
+@@ -0,0 +1,26 @@
 +# SPDX-License-Identifier: GPL-2.0-only
 +
 +config XR17032
@@ -11,8 +11,16 @@ diff -urN --no-dereference linux-clean/arch/xr17032/Kconfig linux-workdir/arch/x
 +	select HAVE_PAGE_SIZE_4KB
 +	select ARCH_SPARSEMEM_ENABLE
 +	select GENERIC_IOREMAP
++	select FUNCTION_ALIGNMENT_4B
++	select GENERIC_IRQ_SHOW
 +
 +config MMU
++	def_bool y
++
++config GENERIC_CALIBRATE_DELAY
++	def_bool y
++
++config GENERIC_HWEIGHT
 +	def_bool y
 +
 +menu "Kernel features"
@@ -761,7 +769,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/pgalloc.h linux-
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/pgtable.h linux-workdir/arch/xr17032/include/asm/pgtable.h
 --- linux-clean/arch/xr17032/include/asm/pgtable.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/pgtable.h
-@@ -0,0 +1,271 @@
+@@ -0,0 +1,285 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -809,6 +817,20 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/pgtable.h linux-
 +					  _PAGE_KERNEL | _PAGE_GLOBAL))
 +
 +#define _PAGE_PROT_NONE	_PAGE_GLOBAL
++
++#define _PAGE_BASE	(_PAGE_PRESENT | _PAGE_ACCESSED)
++
++#define PAGE_NONE	__pgprot(_PAGE_PROT_NONE)
++#define PAGE_READ	__pgprot(_PAGE_BASE)
++#define PAGE_WRITE	__pgprot(_PAGE_BASE | _PAGE_WRITE)
++#define PAGE_EXEC	__pgprot(_PAGE_BASE)
++#define PAGE_READ_EXEC	__pgprot(_PAGE_BASE)
++#define PAGE_WRITE_EXEC	__pgprot(_PAGE_BASE | _PAGE_WRITE)
++
++#define PAGE_COPY		PAGE_READ
++#define PAGE_COPY_EXEC		PAGE_READ_EXEC
++#define PAGE_SHARED		PAGE_WRITE
++#define PAGE_SHARED_EXEC	PAGE_WRITE_EXEC
 +
 +#define _PAGE_SWP_EXCLUSIVE (1 << 5)
 +
@@ -1698,13 +1720,16 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/uapi/asm/sigcontext.
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/Makefile linux-workdir/arch/xr17032/kernel/Makefile
 --- linux-clean/arch/xr17032/kernel/Makefile	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/Makefile
-@@ -0,0 +1,6 @@
+@@ -0,0 +1,9 @@
 +# SPDX-License-Identifier: GPL-2.0-only
 +#
 +# Makefile for the XR/17032 Linux kernel
 +#
 +
 +always-$(KBUILD_BUILTIN) += vmlinux.lds
++
++obj-y += asm-stubs.o
++obj-y += stubs.o
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/asm-offsets.c linux-workdir/arch/xr17032/kernel/asm-offsets.c
 --- linux-clean/arch/xr17032/kernel/asm-offsets.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/asm-offsets.c
@@ -1718,6 +1743,206 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/asm-offsets.c linux-w
 +
 +void asm_offsets(void)
 +{
++}
+diff -urN --no-dereference linux-clean/arch/xr17032/kernel/asm-stubs.S linux-workdir/arch/xr17032/kernel/asm-stubs.S
+--- linux-clean/arch/xr17032/kernel/asm-stubs.S	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/kernel/asm-stubs.S
+@@ -0,0 +1,35 @@
++#include <linux/linkage.h>
++
++.text
++
++SYM_FUNC_START(__ashldi3)
++	brk
++SYM_FUNC_END(__ashldi3)
++
++SYM_FUNC_START(__asm_copy_from_user)
++	brk
++SYM_FUNC_END(__asm_copy_from_user)
++
++SYM_FUNC_START(__asm_copy_to_user)
++	brk
++SYM_FUNC_END(__asm_copy_to_user)
++
++SYM_FUNC_START(__clear_user)
++	brk
++SYM_FUNC_END(__clear_user)
++
++SYM_FUNC_START(__lshrdi3)
++	brk
++SYM_FUNC_END(__lshrdi3)
++
++SYM_FUNC_START(__muldi3)
++	brk
++SYM_FUNC_END(__muldi3)
++
++SYM_FUNC_START(__one_cmpldi2)
++	brk
++SYM_FUNC_END(__one_cmpldi2)
++
++SYM_FUNC_START(__switch_to)
++	brk
++SYM_FUNC_END(__switch_to)
+diff -urN --no-dereference linux-clean/arch/xr17032/kernel/stubs.c linux-workdir/arch/xr17032/kernel/stubs.c
+--- linux-clean/arch/xr17032/kernel/stubs.c	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/kernel/stubs.c
+@@ -0,0 +1,157 @@
++#include <asm/mmu_context.h>
++#include <asm/page.h>
++#include <asm/pgtable.h>
++#include <asm/processor.h>
++#include <asm/tlbflush.h>
++#include <linux/delay.h>
++#include <linux/init.h>
++#include <linux/mm.h>
++#include <linux/ptrace.h>
++#include <linux/reboot.h>
++#include <linux/sched.h>
++#include <linux/sched/debug.h>
++#include <linux/seq_file.h>
++
++const struct seq_operations cpuinfo_op;
++
++unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)]
++	__page_aligned_bss;
++
++struct kernel_mapping kernel_map;
++
++pgd_t swapper_pg_dir[PTRS_PER_PGD] __page_aligned_bss;
++
++static const pgprot_t protection_map[] = {
++	[VM_NONE]					= PAGE_NONE,
++	[VM_READ]					= PAGE_READ,
++	[VM_WRITE]					= PAGE_COPY,
++	[VM_WRITE | VM_READ]				= PAGE_COPY,
++	[VM_EXEC]					= PAGE_EXEC,
++	[VM_EXEC | VM_READ]				= PAGE_READ_EXEC,
++	[VM_EXEC | VM_WRITE]				= PAGE_COPY_EXEC,
++	[VM_EXEC | VM_WRITE | VM_READ]			= PAGE_COPY_EXEC,
++	[VM_SHARED]					= PAGE_NONE,
++	[VM_SHARED | VM_READ]				= PAGE_READ,
++	[VM_SHARED | VM_WRITE]				= PAGE_SHARED,
++	[VM_SHARED | VM_WRITE | VM_READ]		= PAGE_SHARED,
++	[VM_SHARED | VM_EXEC]				= PAGE_EXEC,
++	[VM_SHARED | VM_EXEC | VM_READ]			= PAGE_READ_EXEC,
++	[VM_SHARED | VM_EXEC | VM_WRITE]		= PAGE_SHARED_EXEC,
++	[VM_SHARED | VM_EXEC | VM_WRITE | VM_READ]	= PAGE_SHARED_EXEC
++};
++
++DECLARE_VM_GET_PAGE_PROT
++
++long arch_ptrace(struct task_struct *child, long request,
++		 unsigned long addr, unsigned long data)
++{
++	__builtin_trap();
++}
++
++void __const_udelay(unsigned long xloops)
++{
++	__builtin_trap();
++}
++
++int copy_thread(struct task_struct *p, const struct kernel_clone_args *args)
++{
++	__builtin_trap();
++}
++
++void flush_thread(void)
++{
++	__builtin_trap();
++}
++
++void flush_tlb_kernel_range(unsigned long start, unsigned long end)
++{
++	__builtin_trap();
++}
++
++void flush_tlb_mm(struct mm_struct *mm)
++{
++	__builtin_trap();
++}
++
++void flush_tlb_mm_range(struct mm_struct *mm, unsigned long start,
++			unsigned long end, unsigned int page_size)
++{
++	__builtin_trap();
++}
++
++void flush_tlb_page(struct vm_area_struct *vma, unsigned long addr)
++{
++	__builtin_trap();
++}
++
++void flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
++		     unsigned long end)
++{
++	__builtin_trap();
++}
++
++unsigned long __get_wchan(struct task_struct *task)
++{
++	__builtin_trap();
++}
++
++void __init init_IRQ(void)
++{
++	__builtin_trap();
++}
++
++void machine_halt(void)
++{
++	__builtin_trap();
++}
++
++void machine_power_off(void)
++{
++	__builtin_trap();
++}
++
++void machine_restart(char *cmd)
++{
++	__builtin_trap();
++}
++
++void ptrace_disable(struct task_struct *child)
++{
++	__builtin_trap();
++}
++
++void __init setup_arch(char **cmdline_p)
++{
++	__builtin_trap();
++}
++
++void show_regs(struct pt_regs *regs)
++{
++	__builtin_trap();
++}
++
++void show_stack(struct task_struct *task, unsigned long *sp, const char *loglvl)
++{
++	__builtin_trap();
++}
++
++void start_thread(struct pt_regs *regs, unsigned long pc, unsigned long sp)
++{
++	__builtin_trap();
++}
++
++void switch_mm(struct mm_struct *prev, struct mm_struct *next,
++	       struct task_struct *task)
++{
++	__builtin_trap();
++}
++
++void __init time_init(void)
++{
++	__builtin_trap();
++}
++
++void __delay(unsigned long loops)
++{
++	__builtin_trap();
 +}
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/vmlinux.lds.S linux-workdir/arch/xr17032/kernel/vmlinux.lds.S
 --- linux-clean/arch/xr17032/kernel/vmlinux.lds.S	1970-01-01 01:00:00.000000000 +0100
