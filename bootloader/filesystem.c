@@ -1,5 +1,4 @@
 #include "filesystem.h"
-
 #include "compiler.h"
 #include "logging.h"
 #include "memory.h"
@@ -22,6 +21,8 @@
 
 #define BI_MAX_NAME_LEN 0xff
 #define BI_MAX_SYMLINKS 5
+
+#define BI_INDIRECT_LEVELS 3
 
 struct BiSuperblock {
     uint32_t _Inodes;
@@ -92,9 +93,9 @@ struct BiInode {
     uint32_t _Flags;
     uint32_t _Osv1;
     uint32_t DirectBlocks[12];
-    uint32_t IndirectBlock;
-    uint32_t DoubleIndirectBlock;
-    uint32_t TripleIndirectBlock;
+    uint32_t IndirectBlocks[BI_INDIRECT_LEVELS];
+    /*uint32_t DoubleIndirectBlock;
+    uint32_t TripleIndirectBlock;*/
     uint32_t _Generation;
     uint32_t _ExtendedAttributesBlock;
     uint32_t SizeUpper;
@@ -142,11 +143,12 @@ static void BiReadInode(struct BiInode *out, uint32_t inode) {
         out->DirectBlocks[i] = BL_LE32(out->DirectBlocks[i]);
     }
 
+    for (size_t i = 0; i < BI_INDIRECT_LEVELS; i++) {
+        out->IndirectBlocks[i] = BL_LE32(out->IndirectBlocks[i]);
+    }
+
     out->Mode = BL_LE16(out->Mode);
     out->Size = BL_LE32(out->Size);
-    out->IndirectBlock = BL_LE32(out->IndirectBlock);
-    out->DoubleIndirectBlock = BL_LE32(out->DoubleIndirectBlock);
-    out->TripleIndirectBlock = BL_LE32(out->TripleIndirectBlock);
 
     if (BiSuperblock.WriteRequiredFeatures & BI_SIZE_64) out->SizeUpper = BL_LE32(out->SizeUpper);
 }
@@ -161,35 +163,28 @@ static uint64_t BiGetInodeBlockBase(struct BiInode *inode, uint64_t block) {
     if (block < BL_ARRAY_SIZE(inode->DirectBlocks)) return inode->DirectBlocks[block];
     block -= BL_ARRAY_SIZE(inode->DirectBlocks);
 
-    uint32_t zeroIndex = block & BiIndirectionMask;
-    uint32_t zeroPointerBlock = inode->IndirectBlock;
-    block >>= BiIndirectionShift;
+    uint32_t blocks = BiIndirectionCount;
+    size_t level;
 
-    if (block) {
-        uint32_t oneIndex = block & BiIndirectionMask;
-        uint32_t onePointerBlock = inode->DoubleIndirectBlock;
-        block >>= BiIndirectionShift;
-
-        if (block) {
-            uint32_t twoIndex = block & BiIndirectionMask;
-            uint32_t twoPointerBlock = inode->TripleIndirectBlock;
-            block >>= BiIndirectionShift;
-
-            if (block) BlCrash("tried to read beyond inode maximum bounds");
-
-            if (!twoPointerBlock) return 0;
-            onePointerBlock = BiReadFromPointerBlock(twoPointerBlock, twoIndex);
-        }
-
-        if (!onePointerBlock) return 0;
-        zeroPointerBlock = BiReadFromPointerBlock(onePointerBlock, oneIndex);
+    for (level = 0; level < BI_INDIRECT_LEVELS; level++) {
+        if (block < blocks) break;
+        block -= blocks;
+        blocks <<= BiIndirectionShift;
     }
 
-    if (!zeroPointerBlock) return 0;
-    return BiReadFromPointerBlock(zeroPointerBlock, zeroIndex);
-}
+    if (level >= BI_INDIRECT_LEVELS) BlCrash("tried to read beyond inode maximum bounds");
 
-void TestFunc(const char *, ...);
+    uint32_t volumeBlock = inode->IndirectBlocks[level++];
+
+    while (level > 0) {
+        if (!volumeBlock) break;
+
+        uint32_t index = (block >> (BiIndirectionShift * --level)) & BiIndirectionMask;
+        volumeBlock = BiReadFromPointerBlock(volumeBlock, index);
+    }
+
+    return volumeBlock;
+}
 
 static void BiReadFromInode(struct BiInode *inode, void *buffer, size_t size, uint64_t position) {
     while (size) {
