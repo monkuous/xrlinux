@@ -23,7 +23,7 @@ When the protocol is changed in a way that breaks backwards compatibility, `Majo
 
 On entry, the machine state is as follows:
 - Data and instruction caches coherent with main memory.
-- `RS`: `M` is 0, `U` is 0. All other bits are in an undefined state.
+- `RS`: `T` is 0, `M` is 0, `U` is 0. All other bits are in an undefined state.
 - `PC`: Set to the physical address corresponding to `Header.Entry`.
 - `A0`: Same as `PC`. Note that this cannot be used to access kernel code or data outside the page of the entry point, 
   as the kernel image is not necessarily contiguous in physical memory.
