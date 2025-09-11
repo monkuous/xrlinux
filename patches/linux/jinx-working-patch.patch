@@ -10,7 +10,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/Kbuild linux-workdir/arch/xr
 diff -urN --no-dereference linux-clean/arch/xr17032/Kconfig linux-workdir/arch/xr17032/Kconfig
 --- linux-clean/arch/xr17032/Kconfig	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/Kconfig
-@@ -0,0 +1,26 @@
+@@ -0,0 +1,29 @@
 +# SPDX-License-Identifier: GPL-2.0-only
 +
 +config XR17032
@@ -22,6 +22,9 @@ diff -urN --no-dereference linux-clean/arch/xr17032/Kconfig linux-workdir/arch/x
 +	select GENERIC_IOREMAP
 +	select FUNCTION_ALIGNMENT_4B
 +	select GENERIC_IRQ_SHOW
++	select GENERIC_LIB_ASHLDI3
++	select GENERIC_LIB_LSHRDI3
++	select GENERIC_LIB_MULDI3
 +
 +config MMU
 +	def_bool y
@@ -1800,14 +1803,10 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/asm-offsets.c linux-w
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/asm-stubs.S linux-workdir/arch/xr17032/kernel/asm-stubs.S
 --- linux-clean/arch/xr17032/kernel/asm-stubs.S	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/asm-stubs.S
-@@ -0,0 +1,31 @@
+@@ -0,0 +1,19 @@
 +#include <linux/linkage.h>
 +
 +.text
-+
-+SYM_FUNC_START(__ashldi3)
-+	brk
-+SYM_FUNC_END(__ashldi3)
 +
 +SYM_FUNC_START(__asm_copy_from_user)
 +	brk
@@ -1820,14 +1819,6 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/asm-stubs.S linux-wor
 +SYM_FUNC_START(__clear_user)
 +	brk
 +SYM_FUNC_END(__clear_user)
-+
-+SYM_FUNC_START(__lshrdi3)
-+	brk
-+SYM_FUNC_END(__lshrdi3)
-+
-+SYM_FUNC_START(__muldi3)
-+	brk
-+SYM_FUNC_END(__muldi3)
 +
 +SYM_FUNC_START(__switch_to)
 +	brk
