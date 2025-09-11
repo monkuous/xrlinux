@@ -47,7 +47,7 @@ static void BiReadFromDisk(void *buffer, uint64_t position, size_t count) {
     while (count != 0) {
         uint64_t block = position >> BI_BCACHE_SHIFT;
         size_t offset = position & BI_BCACHE_MASK;
-        size_t current = MIN(BI_BCACHE_SIZE - offset, count);
+        size_t current = BL_MIN(BI_BCACHE_SIZE - offset, count);
 
         BlCopyMemory(buffer, BiGetBcacheEntry(block) + offset, current);
 
@@ -89,19 +89,19 @@ void BlFindRootPartition(void) {
     struct Mbr mbr;
     BiReadFromDisk(&mbr, BI_MBR_OFFSET, sizeof(mbr));
 
-    if (LE32(mbr.Signature) != BI_MBR_SIGNATURE) BlCrash("invalid mbr");
+    if (BL_LE32(mbr.Signature) != BI_MBR_SIGNATURE) BlCrash("invalid mbr");
 
-    for (size_t i = 0; i < ARRAY_SIZE(mbr.Partitions); i++) {
+    for (size_t i = 0; i < BL_ARRAY_SIZE(mbr.Partitions); i++) {
         struct MbrPartition *mbrPart = &mbr.Partitions[i];
         if (mbrPart->BootIndicator != 0 && mbrPart->BootIndicator != 0x80) BlCrash("invalid mbr");
     }
 
-    for (size_t i = 0; i < ARRAY_SIZE(mbr.Partitions); i++) {
+    for (size_t i = 0; i < BL_ARRAY_SIZE(mbr.Partitions); i++) {
         struct MbrPartition *mbrPart = &mbr.Partitions[i];
-        if (mbrPart->Type == 0 || LE32(mbrPart->SizeInLba) == 0) continue;
+        if (mbrPart->Type == 0 || BL_LE32(mbrPart->SizeInLba) == 0) continue;
 
-        BlRootPartition.Start = (uint64_t)LE32(mbrPart->StartingLba) << BL_SECTOR_SHIFT;
-        BlRootPartition.Size = (uint64_t)LE32(mbrPart->SizeInLba) << BL_SECTOR_SHIFT;
+        BlRootPartition.Start = (uint64_t)BL_LE32(mbrPart->StartingLba) << BL_SECTOR_SHIFT;
+        BlRootPartition.Size = (uint64_t)BL_LE32(mbrPart->SizeInLba) << BL_SECTOR_SHIFT;
 
         if (!BlFsInitialize()) continue;
 

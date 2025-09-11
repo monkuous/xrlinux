@@ -3,28 +3,28 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define USED __attribute__((used))
+#define BL_USED __attribute__((used))
 
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
-#define ALIGN_UP(x, y)               \
+#define BL_ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
+#define BL_ALIGN_UP(x, y)            \
     ({                               \
         __typeof__(x) _x = (x);      \
         __typeof__(x) _y = (y);      \
         (_x + (_y - 1)) & ~(_y - 1); \
     })
-#define ALIGN_DOWN(x, y)        \
+#define BL_ALIGN_DOWN(x, y)     \
     ({                          \
         __typeof__(x) _x = (x); \
         __typeof__(x) _y = (y); \
         _x & ~(_y - 1);         \
     })
-#define MIN(x, y)               \
+#define BL_MIN(x, y)               \
     ({                          \
         __typeof__(x) _x = (x); \
         __typeof__(y) _y = (y); \
         _x <= _y ? _x : _y;     \
     })
-#define CONTAINER(type, name, value)                            \
+#define BL_CONTAINER(type, name, value)                         \
     ({                                                          \
         void *_ptr = (value);                                   \
         _ptr ? (type *)(_ptr - offsetof(type, name)) : nullptr; \
@@ -45,21 +45,21 @@ static inline uint64_t BlSwap64(uint64_t x) {
 }
 
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-#define LE16(x) (x)
-#define LE32(x) (x)
-#define LE64(x) (x)
+#define BL_LE16(x) (x)
+#define BL_LE32(x) (x)
+#define BL_LE64(x) (x)
 
-#define BE16(x) BlSwap16(x)
-#define BE32(x) BlSwap32(x)
-#define BE64(x) BlSwap64(x)
+#define BL_BE16(x) BlSwap16(x)
+#define BL_BE32(x) BlSwap32(x)
+#define BL_BE64(x) BlSwap64(x)
 #elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-#define BE16(x) (x)
-#define BE32(x) (x)
-#define BE64(x) (x)
+#define BL_BE16(x) (x)
+#define BL_BE32(x) (x)
+#define BL_BE64(x) (x)
 
-#define LE16(x) BlSwap16(x)
-#define LE32(x) BlSwap32(x)
-#define LE64(x) BlSwap64(x)
+#define BL_LE16(x) BlSwap16(x)
+#define BL_LE32(x) BlSwap32(x)
+#define BL_LE64(x) BlSwap64(x)
 #else
 #error "Unsupported endianness"
 #endif
@@ -69,9 +69,9 @@ typedef int32_t ssize_t;
 extern _Noreturn void BlAssertionFailed(const char *expr, const char *file, int line, const char *func);
 
 #ifndef NDEBUG
-#define ASSERT(x) (__builtin_expect(!!(x), 1) ? (void)0 : BlAssertionFailed(#x, __FILE__, __LINE__, __func__))
+#define BL_ASSERT(x) (__builtin_expect(!!(x), 1) ? (void)0 : BlAssertionFailed(#x, __FILE__, __LINE__, __func__))
 #else
-#define ASSERT(x) (__builtin_expect(!!(x), 1) ? (void)0 : __builtin_unreachable())
+#define BL_ASSERT(x) (__builtin_expect(!!(x), 1) ? (void)0 : __builtin_unreachable())
 #endif
 
 static inline int BlCompareMemory(const void *s1, const void *s2, size_t count) {

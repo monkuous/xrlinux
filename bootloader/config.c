@@ -24,7 +24,7 @@ static struct BiOption BiOptions[] = {
 };
 
 static void BiValidateOptions(void) {
-    for (size_t i = 0; i < ARRAY_SIZE(BiOptions); i++) {
+    for (size_t i = 0; i < BL_ARRAY_SIZE(BiOptions); i++) {
         struct BiOption *option = &BiOptions[i];
 
         if ((option->Flags & (BI_REQUIRED | BI_PROVIDED)) == BI_REQUIRED) {
@@ -38,7 +38,7 @@ static bool BiIsWhitespace(char c) {
 }
 
 static struct BiOption *BlFindOption(const char *name, size_t nameLength) {
-    for (size_t i = 0; i < ARRAY_SIZE(BiOptions); i++) {
+    for (size_t i = 0; i < BL_ARRAY_SIZE(BiOptions); i++) {
         struct BiOption *option = &BiOptions[i];
 
         if (BlStringLength(option->Name) == nameLength && BlCompareMemory(option->Name, name, nameLength) == 0) {

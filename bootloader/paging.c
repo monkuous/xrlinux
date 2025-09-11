@@ -16,7 +16,7 @@ typedef uint32_t pte_t;
 
 #define BI_PFN_MASK (((pte_t)1 << BI_PFN_BITS) - 1)
 
-USED _Alignas(BL_PAGE_SIZE) pte_t BlPageTable[BI_LEVEL_SIZE];
+BL_USED _Alignas(BL_PAGE_SIZE) pte_t BlPageTable[BI_LEVEL_SIZE];
 
 _Static_assert(sizeof(BlPageTable) == BL_PAGE_SIZE, "Page table size incorrect");
 

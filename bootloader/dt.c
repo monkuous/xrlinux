@@ -32,8 +32,8 @@ struct BlDtNode {
     size_t NumberOfProperties;
 };
 
-#define BL_DT_NODE_SIZE(nameLength) (8 + ALIGN_UP((nameLength) + 1, 4))
-#define BL_DT_PROP_SIZE(dataSize) (12 + ALIGN_UP(dataSize, 4))
+#define BL_DT_NODE_SIZE(nameLength) (8 + BL_ALIGN_UP((nameLength) + 1, 4))
+#define BL_DT_PROP_SIZE(dataSize) (12 + BL_ALIGN_UP(dataSize, 4))
 
 static struct BlDtRsvMem *BlDtRsvMem;
 static size_t BlDtRsvMemCount;
@@ -156,7 +156,7 @@ void BlDtAddPropertyU32s(struct BlDtNode *parent, const char *name, const uint32
     auto buffer = BL_ALLOCATE(uint32_t, count);
 
     for (uint32_t i = 0; i < count; i++) {
-        buffer[i] = BE32(data[i]);
+        buffer[i] = BL_BE32(data[i]);
     }
 
     BlDtDoAddProperty(parent, name, buffer, count * 4);
@@ -212,10 +212,10 @@ struct BlFdtRsvmapEntry {
 #define BL_FDT_END 9
 
 static void BlDtAddDataAndAlign(void *structure, size_t *offset, const void *data, size_t size) {
-    size_t aligned = ALIGN_UP(size, 4);
+    size_t aligned = BL_ALIGN_UP(size, 4);
     size_t curOff = *offset;
     size_t newOff = curOff + aligned;
-    ASSERT(newOff <= BlDtStructureSize);
+    BL_ASSERT(newOff <= BlDtStructureSize);
 
     BlCopyMemory(structure + curOff, data, size);
     BlFillMemory(structure + curOff + size, 0, aligned - size);
@@ -226,9 +226,9 @@ static void BlDtAddDataAndAlign(void *structure, size_t *offset, const void *dat
 static void BlDtAddToken(void *structure, size_t *offset, uint32_t token) {
     size_t curOff = *offset;
     size_t newOff = curOff + 4;
-    ASSERT(newOff <= BlDtStructureSize);
+    BL_ASSERT(newOff <= BlDtStructureSize);
 
-    *(uint32_t *)(structure + curOff) = BE32(token);
+    *(uint32_t *)(structure + curOff) = BL_BE32(token);
 
     *offset = newOff;
 }
@@ -244,16 +244,16 @@ void *BlDtBuildBlob(void) {
     void *structure = (void *)rsvmap + rsvMapSize;
     void *strings = structure + BlDtStructureSize;
 
-    header->Magic = BE32(BL_FDT_MAGIC);
-    header->TotalSize = BE32(totalSize);
-    header->OffDtStruct = BE32(sizeof(*header) + rsvMapSize);
-    header->OffDtStrings = BE32(sizeof(*header) + rsvMapSize + BlDtStructureSize);
-    header->OffMemRsvmap = BE32(sizeof(*header));
-    header->Version = BE32(BL_FDT_VERSION);
-    header->LastCompVersion = BE32(BL_FDT_COMP_VERSION);
-    header->BootCpuidPhys = BE32(BlReadWhami());
-    header->SizeDtStrings = BE32(BlDtStringsSize);
-    header->SizeDtStruct = BE32(BlDtStructureSize);
+    header->Magic = BL_BE32(BL_FDT_MAGIC);
+    header->TotalSize = BL_BE32(totalSize);
+    header->OffDtStruct = BL_BE32(sizeof(*header) + rsvMapSize);
+    header->OffDtStrings = BL_BE32(sizeof(*header) + rsvMapSize + BlDtStructureSize);
+    header->OffMemRsvmap = BL_BE32(sizeof(*header));
+    header->Version = BL_BE32(BL_FDT_VERSION);
+    header->LastCompVersion = BL_BE32(BL_FDT_COMP_VERSION);
+    header->BootCpuidPhys = BL_BE32(BlReadWhami());
+    header->SizeDtStrings = BL_BE32(BlDtStringsSize);
+    header->SizeDtStruct = BL_BE32(BlDtStructureSize);
 
     // Build rsvmap
     size_t i;
@@ -270,7 +270,7 @@ void *BlDtBuildBlob(void) {
         BL_LIST_FOREACH(BlDtStrings[i], struct BlDtString, Node, str) {
             size_t size = BlStringLength(str->Data) + 1;
             size_t newOffset = offset + size;
-            ASSERT(newOffset <= BlDtStringsSize);
+            BL_ASSERT(newOffset <= BlDtStringsSize);
 
             str->Identifier = offset;
             BlCopyMemory(strings + offset, str->Data, size);
@@ -278,7 +278,7 @@ void *BlDtBuildBlob(void) {
             offset = newOffset;
         }
     }
-    ASSERT(offset == BlDtStringsSize);
+    BL_ASSERT(offset == BlDtStringsSize);
 
     // Build structure
     struct BlDtNode *node = &BlDtRootNode;
@@ -315,7 +315,7 @@ void *BlDtBuildBlob(void) {
     }
 
     BlDtAddToken(structure, &offset, BL_FDT_END);
-    ASSERT(offset == BlDtStructureSize);
+    BL_ASSERT(offset == BlDtStructureSize);
 
     return header;
 }

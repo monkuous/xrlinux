@@ -16,8 +16,8 @@ static struct BlList BlHeapRanges;
 static struct BlList BlFreeRanges;
 
 void BlAddHeapRange(uintptr_t base, size_t size) {
-    uintptr_t end = ALIGN_DOWN(base + size, HEAP_ALIGNMENT);
-    base = ALIGN_UP(base, HEAP_ALIGNMENT);
+    uintptr_t end = BL_ALIGN_DOWN(base + size, HEAP_ALIGNMENT);
+    base = BL_ALIGN_UP(base, HEAP_ALIGNMENT);
     if (base >= end) return;
 
     struct HeapRange *prev = nullptr;
@@ -66,14 +66,14 @@ void *BlAllocateHeap(size_t size, size_t alignment, bool permanent) {
     if (size == 0) return nullptr;
     if (alignment < HEAP_ALIGNMENT) alignment = HEAP_ALIGNMENT;
 
-    size = ALIGN_UP(size, HEAP_ALIGNMENT);
+    size = BL_ALIGN_UP(size, HEAP_ALIGNMENT);
 
     size_t headExtra = permanent ? 0 : sizeof(struct HeapRange);
 
     BL_LIST_FOREACH(BlFreeRanges, struct HeapRange, FreeNode, range) {
         uintptr_t rangeBase = (uintptr_t)range;
         uintptr_t rangeEnd = range->End;
-        uintptr_t valueBase = ALIGN_UP(rangeBase + headExtra, alignment);
+        uintptr_t valueBase = BL_ALIGN_UP(rangeBase + headExtra, alignment);
         uintptr_t allocBase = valueBase - headExtra;
         uintptr_t allocEnd = valueBase + size;
 
@@ -119,7 +119,7 @@ void *BlResizeHeap(void *ptr, size_t newSize, size_t alignment) {
         return nullptr;
     }
 
-    newSize = ALIGN_UP(newSize, HEAP_ALIGNMENT);
+    newSize = BL_ALIGN_UP(newSize, HEAP_ALIGNMENT);
 
     struct HeapRange *range = ptr - sizeof(*range);
     size_t oldSize = range->End - (size_t)ptr;

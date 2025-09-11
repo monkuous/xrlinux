@@ -42,7 +42,7 @@ static void BxAddMemoryRanges(void) {
 
     uintptr_t minHeapAddr = (uintptr_t)&BxImageEnd;
 
-    for (size_t i = 0; i < ARRAY_SIZE(BxDeviceDatabase->RamBanks); i++) {
+    for (size_t i = 0; i < BL_ARRAY_SIZE(BxDeviceDatabase->RamBanks); i++) {
         size_t pages = BxDeviceDatabase->RamBanks[i].PageFrameCount;
         if (!pages) continue;
 
@@ -58,20 +58,20 @@ static void BxAddMemoryRanges(void) {
 
 static void BxDtAddMemoryBank(size_t start, size_t end) {
     char buffer[32];
-    BlPrintToBuffer(buffer, ARRAY_SIZE(buffer), "memory@%zx", start);
+    BlPrintToBuffer(buffer, BL_ARRAY_SIZE(buffer), "memory@%zx", start);
 
     auto node = BlDtCreateNode(nullptr, buffer);
     uint32_t reg[] = {start, end - start};
 
     BlDtAddPropertyString(node, "device_type", "memory");
-    BlDtAddPropertyU32s(node, "reg", reg, ARRAY_SIZE(reg));
+    BlDtAddPropertyU32s(node, "reg", reg, BL_ARRAY_SIZE(reg));
 }
 
 static void BxDtAddMemory(void) {
     size_t start = 0;
     size_t end = 0;
 
-    for (size_t i = 0; i < ARRAY_SIZE(BxDeviceDatabase->RamBanks); i++) {
+    for (size_t i = 0; i < BL_ARRAY_SIZE(BxDeviceDatabase->RamBanks); i++) {
         size_t pages = BxDeviceDatabase->RamBanks[i].PageFrameCount;
         if (!pages) continue;
 
@@ -93,7 +93,7 @@ static void BxDtAddChosen(char *args) {
     BlDtAddPropertyString(node, "bootargs", args);
 }
 
-static uint32_t BxCpuPhandles[ARRAY_SIZE(((struct FwDeviceDatabase *)0)->Processors)];
+static uint32_t BxCpuPhandles[BL_ARRAY_SIZE(((struct FwDeviceDatabase *)0)->Processors)];
 static uint32_t BxLsicPhandle;
 
 static void BxDtAddCpus(void) {
@@ -101,7 +101,7 @@ static void BxDtAddCpus(void) {
     BlDtAddPropertyU32(cpus, "#address-cells", 1);
     BlDtAddPropertyU32(cpus, "#size-cells", 0);
 
-    for (size_t i = 0; i < ARRAY_SIZE(BxDeviceDatabase->Processors); i++) {
+    for (size_t i = 0; i < BL_ARRAY_SIZE(BxDeviceDatabase->Processors); i++) {
         if (!BxDeviceDatabase->Processors[i].Present) continue;
 
         char buffer[32];
@@ -154,7 +154,7 @@ static struct BlDtNode *BxDtAddDevice(
     auto node = BlDtCreateNode(nullptr, buffer);
     uint32_t reg[] = {address, size};
 
-    BlDtAddPropertyU32s(node, "reg", reg, ARRAY_SIZE(reg));
+    BlDtAddPropertyU32s(node, "reg", reg, BL_ARRAY_SIZE(reg));
     BlDtAddPropertyString(node, "compatible", cid);
     BxDtAddInterrupts(node, irq, nirq);
 
@@ -198,7 +198,7 @@ static void BxDtAddLsic(void) {
     uint32_t reg[] = {BX_LSIC_BASE, BX_LSIC_SIZE};
 
     BlDtAddPropertyU32(node, "phandle", BxLsicPhandle);
-    BlDtAddPropertyU32s(node, "reg", reg, ARRAY_SIZE(reg));
+    BlDtAddPropertyU32s(node, "reg", reg, BL_ARRAY_SIZE(reg));
     BlDtAddPropertyString(node, "compatible", "xrarch,lsic");
     BlDtAddPropertyU32s(node, "interrupts-extended", data, BxNumCpus * 2);
     BlDtAddProperty(node, "interrupt-controller", nullptr, 0);
@@ -208,7 +208,7 @@ static void BxDtAddLsic(void) {
 }
 
 static void BxDtAddBoards(void) {
-    for (size_t i = 0; i < ARRAY_SIZE(BxDeviceDatabase->Boards); i++) {
+    for (size_t i = 0; i < BL_ARRAY_SIZE(BxDeviceDatabase->Boards); i++) {
         struct FwBoard *board = &BxDeviceDatabase->Boards[i];
         if (!board->BoardId) continue;
 
@@ -255,7 +255,7 @@ static void BxDtPopulate(char *args) {
     BxDtAddBoards();
 }
 
-USED _Noreturn void BxMain(
+BL_USED _Noreturn void BxMain(
     struct FwDeviceDatabase *deviceDatabase,
     struct FwApiTable *apiTable,
     struct FwPartition *bootPartition,
@@ -265,8 +265,8 @@ USED _Noreturn void BxMain(
     BxApiTable = apiTable;
 
     struct FwDisk *disk = &deviceDatabase->Disks[bootPartition->Id];
-    BxBootDisk = &disk->Partitions[ARRAY_SIZE(disk->Partitions) - 1];
-    ASSERT(BxBootDisk->BaseSector == 0);
+    BxBootDisk = &disk->Partitions[BL_ARRAY_SIZE(disk->Partitions) - 1];
+    BL_ASSERT(BxBootDisk->BaseSector == 0);
 
     BxAddMemoryRanges();
     BxDtPopulate(args);

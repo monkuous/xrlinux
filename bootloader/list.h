@@ -12,10 +12,10 @@ struct BlList {
     struct BlListNode *Tail;
 };
 
-#define BL_LIST_HEAD(type, name, list) CONTAINER(type, name, (list).Head)
-#define BL_LIST_TAIL(type, name, list) CONTAINER(type, name, (list).Tail)
-#define BL_LIST_PREV(type, name, value) CONTAINER(type, name, (value).name.Prev)
-#define BL_LIST_NEXT(type, name, value) CONTAINER(type, name, (value).name.Next)
+#define BL_LIST_HEAD(type, name, list) BL_CONTAINER(type, name, (list).Head)
+#define BL_LIST_TAIL(type, name, list) BL_CONTAINER(type, name, (list).Tail)
+#define BL_LIST_PREV(type, name, value) BL_CONTAINER(type, name, (value).name.Prev)
+#define BL_LIST_NEXT(type, name, value) BL_CONTAINER(type, name, (value).name.Next)
 
 #define BL_LIST_FOREACH(list, type, name, var) \
     for (type *var = BL_LIST_HEAD(type, name, (list)); var != nullptr; var = BL_LIST_NEXT(type, name, *var))

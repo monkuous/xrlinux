@@ -124,7 +124,7 @@ static struct BiInode BiRoot;
 
 static void BiReadBlockGroupDescriptor(struct BiBlockGroupDescriptor *out, uint32_t group) {
     BlReadFromPartition(out, BiBgdtLocation + (uint64_t)group * 32, sizeof(*out));
-    out->InodeTableBlock = LE32(out->InodeTableBlock);
+    out->InodeTableBlock = BL_LE32(out->InodeTableBlock);
 }
 
 static void BiReadInode(struct BiInode *out, uint32_t inode) {
@@ -138,28 +138,28 @@ static void BiReadInode(struct BiInode *out, uint32_t inode) {
     uint64_t location = ((uint64_t)groupDescriptor.InodeTableBlock << BiSuperblock.BlockSizeShift) + offset;
     BlReadFromPartition(out, location, sizeof(*out));
 
-    for (size_t i = 0; i < ARRAY_SIZE(out->DirectBlocks); i++) {
-        out->DirectBlocks[i] = LE32(out->DirectBlocks[i]);
+    for (size_t i = 0; i < BL_ARRAY_SIZE(out->DirectBlocks); i++) {
+        out->DirectBlocks[i] = BL_LE32(out->DirectBlocks[i]);
     }
 
-    out->Mode = LE16(out->Mode);
-    out->Size = LE32(out->Size);
-    out->IndirectBlock = LE32(out->IndirectBlock);
-    out->DoubleIndirectBlock = LE32(out->DoubleIndirectBlock);
-    out->TripleIndirectBlock = LE32(out->TripleIndirectBlock);
+    out->Mode = BL_LE16(out->Mode);
+    out->Size = BL_LE32(out->Size);
+    out->IndirectBlock = BL_LE32(out->IndirectBlock);
+    out->DoubleIndirectBlock = BL_LE32(out->DoubleIndirectBlock);
+    out->TripleIndirectBlock = BL_LE32(out->TripleIndirectBlock);
 
-    if (BiSuperblock.WriteRequiredFeatures & BI_SIZE_64) out->SizeUpper = LE32(out->SizeUpper);
+    if (BiSuperblock.WriteRequiredFeatures & BI_SIZE_64) out->SizeUpper = BL_LE32(out->SizeUpper);
 }
 
 static uint32_t BiReadFromPointerBlock(uint32_t block, uint32_t index) {
     uint32_t value;
     BlReadFromPartition(&value, (block << BiSuperblock.BlockSizeShift) + index * sizeof(value), sizeof(value));
-    return LE32(value);
+    return BL_LE32(value);
 }
 
 static uint64_t BiGetInodeBlockBase(struct BiInode *inode, uint64_t block) {
-    if (block < ARRAY_SIZE(inode->DirectBlocks)) return inode->DirectBlocks[block];
-    block -= ARRAY_SIZE(inode->DirectBlocks);
+    if (block < BL_ARRAY_SIZE(inode->DirectBlocks)) return inode->DirectBlocks[block];
+    block -= BL_ARRAY_SIZE(inode->DirectBlocks);
 
     uint32_t zeroIndex = block & BiIndirectionMask;
     uint32_t zeroPointerBlock = inode->IndirectBlock;
@@ -195,7 +195,7 @@ static void BiReadFromInode(struct BiInode *inode, void *buffer, size_t size, ui
     while (size) {
         uint64_t block = position >> BiSuperblock.BlockSizeShift;
         size_t offset = position & (BiBlockSize - 1);
-        size_t current = MIN(size, BiBlockSize - offset);
+        size_t current = BL_MIN(size, BiBlockSize - offset);
 
         uint64_t blockBase = BiGetInodeBlockBase(inode, block) << BiSuperblock.BlockSizeShift;
 
@@ -230,8 +230,8 @@ static bool BiFindEntryInDirectory(struct BiEntry *out, struct BiInode *dir, con
     while (BiInodeSize(dir) - offset >= sizeof(*out)) {
         BiReadFromInode(dir, out, sizeof(*out), offset);
 
-        out->Inode = LE32(out->Inode);
-        out->Size = LE16(out->Size);
+        out->Inode = BL_LE32(out->Inode);
+        out->Size = BL_LE16(out->Size);
 
         if ((BiSuperblock.RequiredFeatures & BI_DIR_TYPES) != 0 || out->Type == 0) {
             if (out->Inode != 0 && out->NameLength == nameLength) {
@@ -253,12 +253,12 @@ static bool BiFindEntryInDirectory(struct BiEntry *out, struct BiInode *dir, con
 
 bool BlFsInitialize(void) {
     BlReadFromPartition(&BiSuperblock, BI_SUPERBLOCK_OFFSET, sizeof(BiSuperblock));
-    if (LE16(BiSuperblock.Signature) != BI_SIGNATURE) return false;
+    if (BL_LE16(BiSuperblock.Signature) != BI_SIGNATURE) return false;
 
-    BiSuperblock.BlockSizeShift = LE32(BiSuperblock.BlockSizeShift) + 10;
-    BiSuperblock.BlockGroupBlocks = LE32(BiSuperblock.BlockGroupBlocks);
-    BiSuperblock.BlockGroupInodes = LE32(BiSuperblock.BlockGroupInodes);
-    BiSuperblock.VersionMajor = LE32(BiSuperblock.VersionMajor);
+    BiSuperblock.BlockSizeShift = BL_LE32(BiSuperblock.BlockSizeShift) + 10;
+    BiSuperblock.BlockGroupBlocks = BL_LE32(BiSuperblock.BlockGroupBlocks);
+    BiSuperblock.BlockGroupInodes = BL_LE32(BiSuperblock.BlockGroupInodes);
+    BiSuperblock.VersionMajor = BL_LE32(BiSuperblock.VersionMajor);
 
     if (BiSuperblock.VersionMajor < 1) {
         BiSuperblock.InodeSize = 128;
@@ -266,10 +266,10 @@ bool BlFsInitialize(void) {
         BiSuperblock.RequiredFeatures = 0;
         BiSuperblock.WriteRequiredFeatures = 0;
     } else {
-        BiSuperblock.InodeSize = LE16(BiSuperblock.InodeSize);
-        BiSuperblock.OptionalFeatures = LE32(BiSuperblock.OptionalFeatures);
-        BiSuperblock.RequiredFeatures = LE32(BiSuperblock.RequiredFeatures);
-        BiSuperblock.WriteRequiredFeatures = LE32(BiSuperblock.WriteRequiredFeatures);
+        BiSuperblock.InodeSize = BL_LE16(BiSuperblock.InodeSize);
+        BiSuperblock.OptionalFeatures = BL_LE32(BiSuperblock.OptionalFeatures);
+        BiSuperblock.RequiredFeatures = BL_LE32(BiSuperblock.RequiredFeatures);
+        BiSuperblock.WriteRequiredFeatures = BL_LE32(BiSuperblock.WriteRequiredFeatures);
     }
 
     uint32_t missingFeatures = BiSuperblock.RequiredFeatures & ~BI_RO_FEATURES;

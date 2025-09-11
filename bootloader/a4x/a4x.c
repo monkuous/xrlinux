@@ -58,7 +58,7 @@ void BxRunOnOtherCpus(void (*func)(void *), void *ctx) {
     struct BxKickProcessorData data = {func, ctx, 0};
     size_t self = BlReadWhami();
 
-    for (size_t i = 0; i < ARRAY_SIZE(BxDeviceDatabase->Processors); i++) {
+    for (size_t i = 0; i < BL_ARRAY_SIZE(BxDeviceDatabase->Processors); i++) {
         if (i == self) continue;
         if (!BxDeviceDatabase->Processors[i].Present) continue;
 
