@@ -677,7 +677,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/mmu_context.h li
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/page.h linux-workdir/arch/xr17032/include/asm/page.h
 --- linux-clean/arch/xr17032/include/asm/page.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/page.h
-@@ -0,0 +1,83 @@
+@@ -0,0 +1,76 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -722,17 +722,10 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/page.h linux-wor
 +#define __pgd(x)	((pgd_t) { (x) })
 +#define __pgprot(x)	((pgprot_t) { (x) })
 +
-+struct kernel_mapping {
-+	unsigned long va_kernel_pa_offset;
-+};
-+
-+extern struct kernel_mapping kernel_map;
-+
 +#define is_linear_mapping(x)	((x) >= PAGE_OFFSET)
 +
 +#define linear_mapping_va_to_pa(x)	((unsigned long)(x) - PAGE_OFFSET)
-+#define kernel_mapping_va_to_pa(y)	\
-+	((unsigned long)(y) - kernel_map.va_kernel_pa_offset)
++#define kernel_mapping_va_to_pa(y)	({__builtin_trap(); 0UL;})
 +
 +#define __pa(x)								\
 +({									\
@@ -822,7 +815,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/pgalloc.h linux-
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/pgtable.h linux-workdir/arch/xr17032/include/asm/pgtable.h
 --- linux-clean/arch/xr17032/include/asm/pgtable.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/pgtable.h
-@@ -0,0 +1,285 @@
+@@ -0,0 +1,286 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -839,7 +832,8 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/pgtable.h linux-
 +
 +#define TASK_SIZE		0x80000000
 +#define USER_PTRS_PER_PGD	(TASK_SIZE / PGDIR_SIZE)
-+#define KERNEL_LINK_ADDR	TASK_SIZE
++#define _PGTABLE_ADDR		TASK_SIZE
++#define KERNEL_LINK_ADDR	(_PGTABLE_ADDR + PGDIR_SIZE)
 +
 +#ifndef __ASSEMBLER__
 +
@@ -1840,33 +1834,226 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/asm-stubs.S linux-wor
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/arch/xr17032/kernel/head.S
 --- linux-clean/arch/xr17032/kernel/head.S	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/head.S
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,215 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
 + */
 +
++#include <asm/pgtable.h>
 +#include <linux/init.h>
 +#include <linux/linkage.h>
 +
 +__HEAD
++.Lexception_block:
 +
 +SYM_DATA_START_LOCAL(xrlinux_header)
 +	.long 0x584c5258		# magic
 +	.word 0				# minor version
-+	.word 0				# major version
-+	.long _start - xrlinux_header	# entrypoint
++	.word 1				# major version
++	.long xrlinux_header		# virtual address
++	.long _start			# entrypoint
 +	.long _end - xrlinux_header	# size in memory
 +SYM_DATA_END(xrlinux_header)
 +
 +SYM_CODE_START(_start)
++	# set up everything in advance so that in the region where nmi masking
++	# is necessary (from first rs write to mmu enable) we only execute mtcr
++	# (and one jump)
++
 +1:	hlt
 +	beq zero, 1b
++
++	# value to write to *itbctrl to clear the tb
++	addi t0, zero, 3
++
++	# virtual address of exception block
++	lui t1, zero, .Lexception_block
++	ori t1, t1, .Lexception_block
++
++	# itbtag value for exception block
++	add t2, zero, t1 RSH 12
++
++	# itbpte value for exception block
++	add t3, zero, a0 RSH 7
++	ori t3, t3, 0x17 # global, kernel, writable, valid
++
++	# dtbtag value for page table
++	lui t4, zero, (_PGTABLE_ADDR >> 12) | (_PGTABLE_ADDR >> 22)
++	ori t4, t4, (_PGTABLE_ADDR >> 12) | (_PGTABLE_ADDR >> 22)
++
++	# dtbpte value for page table
++	add t5, zero, s0 RSH 7
++	ori t5, t5, 0x17 # global, kernel, writable, valid
++
++	# create entry for recursive paging
++	# all cpus will do this, but they'll all be writing the same value to
++	# the same address, so it doesn't matter
++	mov long [s0 + ((_PGTABLE_ADDR >> 22) * 4)], t5
++
++	# value to write to *tbaddr
++	lui s0, zero, _PGTABLE_ADDR
++	ori s0, s0, _PGTABLE_ADDR
++
++	# initial value for *tbindex and value to write to rs to enable paging
++	addi s1, zero, 4
++
++	# itbtag value for temporary identity map of exception block
++	add s2, zero, a0 RSH 12
++
++	# canonicalize rs to T=0, M=0, I=0, U=0
++	mtcr rs, zero
++
++	# fully clear the tbs
++	mtcr itbctrl, t0
++	mtcr dtbctrl, t0
++
++	# set up exception block (incl. wired itb entry)
++	mtcr eb, t1
++	mtcr itbindex, zero
++	mtcr itbtag, t2
++	mtcr itbpte, t3
++
++	# set up wired dtb entry for page table
++	mtcr dtbindex, zero
++	mtcr dtbtag, t4
++	mtcr dtbpte, t5
++
++	# prepare for enabling paging
++	mtcr itbaddr, s0
++	mtcr dtbaddr, s0
++	mtcr itbindex, s1
++	mtcr dtbindex, s1
++
++	# create non-wired tb entry for identity map of exception block
++	mtcr itbtag, s2
++	mtcr itbpte, t3
++
++	# enable paging
++	mtcr rs, s1
++
++	# jump to virtual addressing (and out of exception block)
++	jalr zero, t1, start_kernel - .Lexception_block
 +SYM_CODE_END(_start)
++
++.org 0x100
++SYM_CODE_START_LOCAL(interrupt_entry)
++1:	hlt
++	beq zero, 1b
++SYM_CODE_END(interrupt_entry)
++
++.org 0x200
++SYM_CODE_START_LOCAL(syscall_entry)
++1:	hlt
++	beq zero, 1b
++SYM_CODE_END(syscall_entry)
++
++.org 0x400
++SYM_CODE_START_LOCAL(bus_error_entry)
++1:	hlt
++	beq zero, 1b
++SYM_CODE_END(bus_error_entry)
++
++.org 0x500
++SYM_CODE_START_LOCAL(nmi_entry)
++1:	hlt
++	beq zero, 1b
++SYM_CODE_END(nmi_entry)
++
++.org 0x600
++SYM_CODE_START_LOCAL(breakpoint_entry)
++1:	hlt
++	beq zero, 1b
++SYM_CODE_END(breakpoint_entry)
++
++.org 0x700
++SYM_CODE_START_LOCAL(invalid_instruction_entry)
++1:	hlt
++	beq zero, 1b
++SYM_CODE_END(invalid_instruction_entry)
++
++.org 0x800
++SYM_CODE_START_LOCAL(privileged_instruction_entry)
++1:	hlt
++	beq zero, 1b
++SYM_CODE_END(privileged_instruction_entry)
++
++.org 0x900
++SYM_CODE_START_LOCAL(unaligned_access_entry)
++1:	hlt
++	beq zero, 1b
++SYM_CODE_END(unaligned_access_entry)
++
++.org 0xc00
++SYM_CODE_START_LOCAL(read_page_fault_entry)
++1:	hlt
++	beq zero, 1b
++SYM_CODE_END(read_page_fault_entry)
++
++.org 0xd00
++SYM_CODE_START_LOCAL(write_page_fault_entry)
++1:	hlt
++	beq zero, 1b
++SYM_CODE_END(write_page_fault_entry)
++
++.org 0xe00
++SYM_CODE_START_LOCAL(handle_itb_miss)
++	mfcr zero, itbaddr
++	mov zero, long [zero]
++	mtcr itbpte, zero
++	rfe
++SYM_CODE_END(handle_itb_miss)
++
++.org 0xf00
++SYM_CODE_START_LOCAL(handle_dtb_miss)
++	mfcr zero, dtbaddr
++	mov zero, long [zero]
++	mtcr dtbpte, zero
++	rfe
++SYM_CODE_END(handle_dtb_miss)
++
++# skip over exception block
++.org 0x1000
++
++SYM_CODE_START_LOCAL(start_kernel)
++	# remove temporary identity map itb entry
++	addi t0, zero, 1
++	mtcr itbctrl, t0
++
++	# get a logical cpu id
++	lui t0, zero, num_started_cpus
++	ori t0, t0, num_started_cpus
++1:	ll a3, t0
++	addi t1, a3, 1
++	sc t1, t0, t1
++	beq t1, 1b
++
++	# make sure we don't have more cpus than we know how to deal with
++#ifdef CONFIG_SMP
++	slti t1, a3, CONFIG_NR_CPUS
++	bne t1, .Lpark_cpu
++#else
++	bne a3, .Lpark_cpu
++#endif
++
++	# only continue on cpu0
++	bne a3, .Lpark_cpu
++
++.Lpark_cpu:
++	hlt
++	beq zero, .Lpark_cpu
++SYM_CODE_END(start_kernel)
++
++.bss
++
++.balign 4
++SYM_DATA_START_LOCAL(num_started_cpus)
++	.space 4
++SYM_DATA_END(num_started_cpus)
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/stubs.c linux-workdir/arch/xr17032/kernel/stubs.c
 --- linux-clean/arch/xr17032/kernel/stubs.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/stubs.c
-@@ -0,0 +1,157 @@
+@@ -0,0 +1,155 @@
 +#include <asm/mmu_context.h>
 +#include <asm/page.h>
 +#include <asm/pgtable.h>
@@ -1885,8 +2072,6 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/stubs.c linux-workdir
 +
 +unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)]
 +	__page_aligned_bss;
-+
-+struct kernel_mapping kernel_map;
 +
 +pgd_t swapper_pg_dir[PTRS_PER_PGD] __page_aligned_bss;
 +
@@ -2027,7 +2212,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/stubs.c linux-workdir
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/vmlinux.lds.S linux-workdir/arch/xr17032/kernel/vmlinux.lds.S
 --- linux-clean/arch/xr17032/kernel/vmlinux.lds.S	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/vmlinux.lds.S
-@@ -0,0 +1,137 @@
+@@ -0,0 +1,136 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -2052,7 +2237,6 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/vmlinux.lds.S linux-w
 +SECTIONS
 +{
 +	. = LOAD_OFFSET;
-+	_start = .;
 +	HEAD_TEXT_SECTION
 +	. = ALIGN(PAGE_SIZE);
 +
@@ -2097,7 +2281,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/vmlinux.lds.S linux-w
 +	}
 +
 +	.init.bss : {
-+		KEEP(*(.init.bss*))	/* from the EFI stub */
++		KEEP(*(.init.bss*))
 +	}
 +	.exit.data :
 +	{
