@@ -1787,7 +1787,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gc
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/gcc/config/xr17032/xr17032.md
 --- gcc-clean/gcc/config/xr17032/xr17032.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.md
-@@ -0,0 +1,739 @@
+@@ -0,0 +1,746 @@
 +;; Machine description for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -1998,6 +1998,13 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +   xori\t%0,zero,%2
 +   nor\t%0,%1,zero
 +   nor\t%0,zero,zero")
++
++(define_insn "one_cmplsi2"
++  [(set (match_operand:SI         0 "register_operand"         "=r")
++	(not:SI (match_operand:SI 1 "xr17032_reg_or_0_operand" "rO")))]
++  ""
++  "@
++   nor\t%0,%z1,zero")
 +
 +;; -------------------------------------------------------------------------
 +;; or instruction
