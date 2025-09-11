@@ -1826,7 +1826,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/asm-stubs.S linux-wor
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/arch/xr17032/kernel/head.S
 --- linux-clean/arch/xr17032/kernel/head.S	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/head.S
-@@ -0,0 +1,227 @@
+@@ -0,0 +1,235 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -2038,6 +2038,14 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/
 +	ori sp, sp, init_thread_union + THREAD_SIZE - PT_SIZE_ON_STACK
 +
 +	addi s0, zero, 0
++
++	# wait until all cpus have entered the kernel
++	lui t0, zero, num_started_cpus
++	ori t0, t0, num_started_cpus
++1:	mov t1, long [t0]
++	slt t1, t1, a2
++	bne t1, 1b
++	mb
 +
 +	# call c entry point
 +	jal start_kernel
