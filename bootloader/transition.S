@@ -4,12 +4,13 @@
 .globl BlTransition
 .type BlTransition, @function
 BlTransition:
-    # clear icache
+    # clear icache (assume dcache is already coherent)
     addi t0, zero, 3
     mtcr icachectrl, t0
 
-    # canonicalize rs (T=0, M=0, I=0, U=0)
-    mtcr rs, zero
+    # load address of page table into t0
+    lui s0, zero, BlPageTable
+    ori s0, s0, BlPageTable
 
     # jump to entrypoint
     jalr zero, a0, 0

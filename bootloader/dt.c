@@ -239,7 +239,7 @@ void *BlDtBuildBlob(void) {
     size_t rsvMapSize = (BlDtRsvMemCount + 1) * sizeof(struct BlFdtRsvmapEntry);
     size_t totalSize = sizeof(struct BlFdtHeader) + rsvMapSize + BlDtStructureSize + BlDtStringsSize;
 
-    struct BlFdtHeader *header = BlAllocateHeap(totalSize, _Alignof(struct BlFdtHeader));
+    struct BlFdtHeader *header = BlAllocateHeap(totalSize, _Alignof(struct BlFdtHeader), true);
     struct BlFdtRsvmapEntry *rsvmap = (void *)header + sizeof(*header);
     void *structure = (void *)rsvmap + rsvMapSize;
     void *strings = structure + BlDtStructureSize;

@@ -62,20 +62,19 @@ void BlAddHeapRange(uintptr_t base, size_t size) {
     }
 }
 
-void *BlAllocateHeap(size_t size, size_t alignment) {
-    //BlPrint("BlAllocateHeap(%zu,%zu)\n", size, alignment);
-    //BlDumpHeap();
-
+void *BlAllocateHeap(size_t size, size_t alignment, bool permanent) {
     if (size == 0) return nullptr;
     if (alignment < HEAP_ALIGNMENT) alignment = HEAP_ALIGNMENT;
 
     size = ALIGN_UP(size, HEAP_ALIGNMENT);
 
+    size_t headExtra = permanent ? 0 : sizeof(struct HeapRange);
+
     BL_LIST_FOREACH(BlFreeRanges, struct HeapRange, FreeNode, range) {
         uintptr_t rangeBase = (uintptr_t)range;
         uintptr_t rangeEnd = range->End;
-        uintptr_t valueBase = ALIGN_UP(rangeBase + sizeof(*range), alignment);
-        uintptr_t allocBase = valueBase - sizeof(*range);
+        uintptr_t valueBase = ALIGN_UP(rangeBase + headExtra, alignment);
+        uintptr_t allocBase = valueBase - headExtra;
         uintptr_t allocEnd = valueBase + size;
 
         if (allocEnd < allocBase || allocBase < rangeBase || allocEnd >= rangeEnd) continue;
@@ -99,10 +98,12 @@ void *BlAllocateHeap(size_t size, size_t alignment) {
             range = newAnchor;
         }
 
-        auto newRange = (struct HeapRange *)allocBase;
-        newRange->End = allocEnd;
-        newRange->Free = false;
-        BlListInsertAfter(&BlHeapRanges, &range->Node, &newRange->Node);
+        if (!permanent) {
+            auto newRange = (struct HeapRange *)allocBase;
+            newRange->End = allocEnd;
+            newRange->Free = false;
+            BlListInsertAfter(&BlHeapRanges, &range->Node, &newRange->Node);
+        }
 
         return (void *)valueBase;
     }
@@ -111,7 +112,7 @@ void *BlAllocateHeap(size_t size, size_t alignment) {
 }
 
 void *BlResizeHeap(void *ptr, size_t newSize, size_t alignment) {
-    if (!ptr) return BlAllocateHeap(newSize, alignment);
+    if (!ptr) return BlAllocateHeap(newSize, alignment, false);
 
     if (newSize == 0) {
         BlFreeHeap(ptr);
@@ -159,7 +160,7 @@ void *BlResizeHeap(void *ptr, size_t newSize, size_t alignment) {
         return ptr;
     }
 
-    void *newPtr = BlAllocateHeap(newSize, alignment);
+    void *newPtr = BlAllocateHeap(newSize, alignment, false);
     BlCopyMemory(newPtr, ptr, oldSize);
     BlFreeHeap(ptr);
     return newPtr;

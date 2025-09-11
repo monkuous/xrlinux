@@ -17,6 +17,7 @@ add_executable(bootloader
         logging.c
         main.c
         memory.c
+        paging.c
         partition.c
         transition.S
 )
