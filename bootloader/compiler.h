@@ -24,6 +24,12 @@
         __typeof__(y) _y = (y); \
         _x <= _y ? _x : _y;     \
     })
+#define BL_MAX(x, y)               \
+    ({                          \
+        __typeof__(x) _x = (x); \
+        __typeof__(y) _y = (y); \
+        _x >= _y ? _x : _y;     \
+    })
 #define BL_CONTAINER(type, name, value)                         \
     ({                                                          \
         void *_ptr = (value);                                   \

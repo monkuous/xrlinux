@@ -2,7 +2,10 @@
 #include "asm.h"
 #include "list.h"
 #include "logging.h"
+#include "main.h"
 #include "memory.h"
+#include "paging.h"
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -238,8 +241,26 @@ void *BlDtBuildBlob(void) {
 
     size_t rsvMapSize = (BlDtRsvMemCount + 1) * sizeof(struct BlFdtRsvmapEntry);
     size_t totalSize = sizeof(struct BlFdtHeader) + rsvMapSize + BlDtStructureSize + BlDtStringsSize;
+    size_t alignment = _Alignof(struct BlFdtHeader);
 
-    struct BlFdtHeader *header = BlAllocateHeap(totalSize, _Alignof(struct BlFdtHeader), true);
+    if (BlKernelHeader.Flags & BL_FLAG_MAP_DTB) {
+        alignment = BL_MAX(alignment, BL_PAGE_SIZE);
+
+        if (BlKernelHeader.DtbAddress + (totalSize - 1) > BlKernelHeader.MaxDtbEnd) {
+            BlCrash("device tree too large to map");
+        }
+    }
+
+    struct BlFdtHeader *header = BlAllocateHeap(totalSize, alignment, true);
+
+    if (BlKernelHeader.Flags & BL_FLAG_MAP_DTB) {
+        paddr_t phys = (paddr_t)(uintptr_t)header;
+
+        for (size_t offset = 0; offset < totalSize; offset += BL_PAGE_SIZE) {
+            BlMapPage(BlKernelHeader.DtbAddress + offset, phys + offset);
+        }
+    }
+
     struct BlFdtRsvmapEntry *rsvmap = (void *)header + sizeof(*header);
     void *structure = (void *)rsvmap + rsvMapSize;
     void *strings = structure + BlDtStructureSize;
