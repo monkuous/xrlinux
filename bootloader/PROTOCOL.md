@@ -74,12 +74,6 @@ Though the MMU is disabled upon entry to the kernel, the bootloader does constru
 This is to allow the kernel image to be noncontiguous in physical memory, as some machines may lack large physically
 contiguous areas of memory.
 
-These page tables only map one area of memory: the kernel image. Specifically, they map the virtual address range
-starting at `AlignDown(Header.VirtualAddr, PAGE_SIZE)` and ending at
-`AlignUp(Header.VirtualAddr + Header.MSize, PAGE_SIZE)` as RWX. The kernel image is loaded into memory such that,
-when the provided page tables are used, it is virtually contiguous with the header at `Header.VirtualAddr`. Mapped
-areas not covered by the on-disk kernel image are zeroed.
-
 The structure used by the page tables is a two-level tree, where bits 22 through 31 of the virtual address determine the
 index into the top-level table, and bits 12 through 21 determine the index into the bottom-level table. Each table is
 page-sized and page-aligned, with 4-byte entries. The entry format matches that of the CPU's TB. All non-valid entries
