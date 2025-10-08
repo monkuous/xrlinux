@@ -182,6 +182,18 @@ void BlDtAddPropertyStrings(struct BlDtNode *parent, const char *name, const cha
     BlDtDoAddProperty(parent, name, buffer, size);
 }
 
+struct BlDtNode *BlDtFindNode(struct BlDtNode *parent, const char *name) {
+    if (!parent) parent = &BlDtRootNode;
+
+    BL_LIST_FOREACH(parent->Children, struct BlDtNode, Node, Node) {
+        if (BlCompareStrings(Node->Name, name) == 0) {
+            return Node;
+        }
+    }
+
+    return nullptr;
+}
+
 uint32_t BlDtAllocPhandle(void) {
     static uint32_t next;
     return ++next;

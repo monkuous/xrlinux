@@ -126,8 +126,16 @@ _Noreturn static void BiDoTransition(void *ptr) {
     BlTransition(data->entrypoint, data->deviceTree, BxNumCpus, BI_PROTOCOL_MINOR);
 }
 
+static void BiProcessConfig(void) {
+    if (BlStdoutPath) {
+        auto chosen = BlDtFindOrCreateNode(nullptr, "chosen");
+        BlDtAddPropertyString(chosen, "stdout-path", BlStdoutPath);
+    }
+}
+
 _Noreturn void BlMain(void) {
     BlFindRootPartition();
+    BiProcessConfig();
 
     BiLoadKernel();
 

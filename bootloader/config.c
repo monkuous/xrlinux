@@ -4,6 +4,7 @@
 #include "memory.h"
 
 const char *BlKernelPath;
+const char *BlStdoutPath;
 
 enum BiOptionType {
     BI_OPTION_STRING,
@@ -21,6 +22,7 @@ struct BiOption {
 
 static struct BiOption BiOptions[] = {
     {"KernelPath", BI_OPTION_STRING, BI_REQUIRED, &BlKernelPath},
+    {"StdoutPath", BI_OPTION_STRING, 0, &BlStdoutPath},
 };
 
 static void BiValidateOptions(void) {
