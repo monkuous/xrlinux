@@ -2185,7 +2185,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/setup.c linux-workdir/arch/xr17032/kernel/setup.c
 --- linux-clean/arch/xr17032/kernel/setup.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/setup.c
-@@ -0,0 +1,46 @@
+@@ -0,0 +1,48 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -2229,6 +2229,8 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/setup.c linux-workdir
 +	parse_early_param();
 +
 +	paging_init();
++
++	unflatten_device_tree();
 +
 +	panic("TODO setup_arch");
 +}
@@ -2550,7 +2552,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/mm/Makefile linux-workdir/ar
 diff -urN --no-dereference linux-clean/arch/xr17032/mm/init.c linux-workdir/arch/xr17032/mm/init.c
 --- linux-clean/arch/xr17032/mm/init.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/mm/init.c
-@@ -0,0 +1,210 @@
+@@ -0,0 +1,211 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -2722,7 +2724,8 @@ diff -urN --no-dereference linux-clean/arch/xr17032/mm/init.c linux-workdir/arch
 +
 +		for (uintptr_t pte_idx = pte_head; pte_idx <= cur_pte_tail;
 +		     pte_idx++) {
-+			ptep[pte_idx] = pfn_pte(start, PAGE_KERNEL_EXEC);
++			unsigned long pfn = PFN_DOWN(start);
++			ptep[pte_idx] = pfn_pte(pfn, PAGE_KERNEL_EXEC);
 +			start += PAGE_SIZE;
 +		}
 +
