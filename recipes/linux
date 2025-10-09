@@ -23,6 +23,6 @@ package() {
     cp -p arch/xr17032/boot/Image "${dest_dir}/boot/linux-${version}"
     cat > "${dest_dir}/xrlinux.cfg" << EOF
 KernelPath: /boot/linux-${version}
-StdoutPath: /serial@f8000048
+StdoutPath: serial1
 EOF
 }

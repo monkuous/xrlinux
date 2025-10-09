@@ -166,10 +166,19 @@ static void BxDtAddRtc(void) {
 }
 
 static void BxDtAddSerial(void) {
+    auto aliases = BlDtCreateNode(nullptr, "aliases");
+
     for (size_t i = 0; i < BX_SERIAL_COUNT; i++) {
         auto node = BxDtAddDevice("serial", "xrarch,serial", BX_SERIAL_BASE(i), BX_SERIAL_SIZE, BX_SERIAL_IRQ(i), 1);
         BlDtAddPropertyU32(node, "clock-frequency", BX_SERIAL_BAUD);
         BlDtAddPropertyU32(node, "current-speed", BX_SERIAL_BAUD);
+
+        char alias[16];
+        BlPrintToBuffer(alias, sizeof(alias), "serial%zu", i);
+
+        char *path = BlDtNodePath(node);
+        BlDtAddPropertyString(aliases, alias, path);
+        BlFreeHeap(path);
     }
 }
 

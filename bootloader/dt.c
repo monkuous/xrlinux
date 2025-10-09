@@ -194,6 +194,34 @@ struct BlDtNode *BlDtFindNode(struct BlDtNode *parent, const char *name) {
     return nullptr;
 }
 
+const char *BlDtNodeName(struct BlDtNode *node) {
+    return node->Name;
+}
+
+char *BlDtNodePath(struct BlDtNode *node) {
+    BL_ASSERT(node != nullptr);
+
+    size_t size = 1;
+
+    for (struct BlDtNode *current = node; current->Parent != nullptr; current = current->Parent) {
+        size += BlStringLength(current->Name) + 1;
+    }
+
+    auto path = BL_ALLOCATE(char, size);
+    path[--size] = 0;
+
+    for (struct BlDtNode *current = node; current->Parent != nullptr; current = current->Parent) {
+        size_t currentLength = BlStringLength(current->Name);
+        size -= currentLength;
+        BlCopyMemory(&path[size], current->Name, currentLength);
+        path[--size] = '/';
+    }
+
+    BL_ASSERT(size == 0);
+
+    return path;
+}
+
 uint32_t BlDtAllocPhandle(void) {
     static uint32_t next;
     return ++next;

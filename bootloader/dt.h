@@ -15,6 +15,9 @@ uint32_t BlDtAllocPhandle(void);
 
 struct BlDtNode *BlDtFindNode(struct BlDtNode *parent, const char *name);
 
+const char *BlDtNodeName(struct BlDtNode *node);
+char *BlDtNodePath(struct BlDtNode *node);
+
 void *BlDtBuildBlob(void);
 
 static inline struct BlDtNode *BlDtFindOrCreateNode(struct BlDtNode *parent, const char *name) {
