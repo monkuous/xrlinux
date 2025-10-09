@@ -590,7 +590,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/extable.h linux-
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/fixmap.h linux-workdir/arch/xr17032/include/asm/fixmap.h
 --- linux-clean/arch/xr17032/include/asm/fixmap.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/fixmap.h
-@@ -0,0 +1,40 @@
+@@ -0,0 +1,41 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -607,6 +607,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/fixmap.h linux-w
 +	FIX_HOLE,
 +
 +	FIX_EARLYCON_MEM_BASE,
++	FIX_PTE,
 +
 +	__end_of_permanent_fixed_addresses,
 +	/*
@@ -903,7 +904,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/pgalloc.h linux-
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/pgtable.h linux-workdir/arch/xr17032/include/asm/pgtable.h
 --- linux-clean/arch/xr17032/include/asm/pgtable.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/pgtable.h
-@@ -0,0 +1,300 @@
+@@ -0,0 +1,303 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -921,7 +922,8 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/pgtable.h linux-
 +
 +#define USER_PTRS_PER_PGD	(TASK_SIZE / PGDIR_SIZE)
 +#define _PGD_ADDR		(_PGTABLE_ADDR | (_PGTABLE_ADDR >> 10))
-+#define KERNEL_LINK_ADDR	(_PGTABLE_ADDR + PGDIR_SIZE)
++#define _SWAPPER_PGD_ADDR	(_PGTABLE_ADDR + PGDIR_SIZE)
++#define KERNEL_LINK_ADDR	(_SWAPPER_PGD_ADDR + PAGE_SIZE)
 +
 +#define PTRS_PER_PGD	(PAGE_SIZE / 4)
 +#define PTRS_PER_PTE	(PAGE_SIZE / 4)
@@ -992,7 +994,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/pgtable.h linux-
 +
 +#define __page_val_to_pfn(_val)  (((_val) & GENMASK(24, 5)) >> PFN_PTE_SHIFT)
 +
-+extern pgd_t swapper_pg_dir[];
++#define swapper_pg_dir ((pgd_t *)_SWAPPER_PGD_ADDR)
 +
 +/*
 + * ZERO_PAGE is a global shared page that is always zero,
@@ -1200,6 +1202,8 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/pgtable.h linux-
 +
 +extern void *_dtb_early_va;
 +extern uintptr_t _dtb_early_pa;
++
++void paging_init(void);
 +
 +#endif /* !defined(__ASSEMBLER__) */
 +
@@ -2181,7 +2185,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/setup.c linux-workdir/arch/xr17032/kernel/setup.c
 --- linux-clean/arch/xr17032/kernel/setup.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/setup.c
-@@ -0,0 +1,44 @@
+@@ -0,0 +1,46 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -2223,6 +2227,8 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/setup.c linux-workdir
 +	early_ioremap_setup();
 +	jump_label_init();
 +	parse_early_param();
++
++	paging_init();
 +
 +	panic("TODO setup_arch");
 +}
@@ -2544,7 +2550,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/mm/Makefile linux-workdir/ar
 diff -urN --no-dereference linux-clean/arch/xr17032/mm/init.c linux-workdir/arch/xr17032/mm/init.c
 --- linux-clean/arch/xr17032/mm/init.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/mm/init.c
-@@ -0,0 +1,82 @@
+@@ -0,0 +1,210 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -2554,8 +2560,13 @@ diff -urN --no-dereference linux-clean/arch/xr17032/mm/init.c linux-workdir/arch
 +#include <asm/page.h>
 +#include <asm/pgtable.h>
 +#include <linux/align.h>
++#include <linux/dma-map-ops.h>
++#include <linux/initrd.h>
 +#include <linux/linkage.h>
++#include <linux/memblock.h>
++#include <linux/minmax.h>
 +#include <linux/mm.h>
++#include <linux/of_fdt.h>
 +
 +void *_dtb_early_va;
 +uintptr_t _dtb_early_pa;
@@ -2563,7 +2574,6 @@ diff -urN --no-dereference linux-clean/arch/xr17032/mm/init.c linux-workdir/arch
 +unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)]
 +__page_aligned_bss;
 +
-+pgd_t swapper_pg_dir[PTRS_PER_PGD] __page_aligned_bss;
 +static pte_t fixmap_pte[PTRS_PER_PTE] __page_aligned_bss;
 +
 +static const pgprot_t protection_map[] = {
@@ -2612,6 +2622,30 @@ diff -urN --no-dereference linux-clean/arch/xr17032/mm/init.c linux-workdir/arch
 +	pgdp[pgd_idx] = pfn_pgd(PFN_DOWN(pa), PAGE_TABLE);
 +}
 +
++static void __init reserve_mapped_memory(void)
++{
++	pte_t *cur_pte = (pte_t *)_PGTABLE_ADDR;
++	pgd_t *cur_pgd = swapper_pg_dir;
++
++	for (unsigned i = 0; i < PTRS_PER_PGD; i++) {
++		pgd_t pgd_entry = *cur_pgd++;
++
++		if (pgd_val(pgd_entry)) {
++			for (unsigned j = 0; j < PTRS_PER_PTE; j++) {
++				pte_t pte_entry = *cur_pte++;
++
++				if (pte_val(pte_entry)) {
++					unsigned long pfn = pte_pfn(pte_entry);
++					memblock_reserve(pfn << PAGE_SHIFT,
++							 PAGE_SIZE);
++				}
++			}
++		} else {
++			cur_pte += PTRS_PER_PTE;
++		}
++	}
++}
++
 +asmlinkage void __init setup_vm(uintptr_t dtb_pa);
 +
 +asmlinkage void __init setup_vm(uintptr_t dtb_pa)
@@ -2623,9 +2657,109 @@ diff -urN --no-dereference linux-clean/arch/xr17032/mm/init.c linux-workdir/arch
 +
 +	pgd_t *early_pg_dir = (pgd_t *)_PGD_ADDR;
 +
++	*(pte_t *)(_PGTABLE_ADDR | (_SWAPPER_PGD_ADDR >> 10))
++		= pfn_pte(__pa(early_pg_dir) >> PAGE_SHIFT, PAGE_KERNEL);
 +	create_pgd_mapping(early_pg_dir, FIXADDR_START, __pa(fixmap_pte));
 +
 +	local_flush_tlb_all();
++
++	reserve_mapped_memory();
++}
++
++static void __init setup_bootmem(void)
++{
++	phys_addr_t max_mapped_addr = __pa(-PAGE_SIZE);
++	memblock_reserve(max_mapped_addr, (phys_addr_t)-max_mapped_addr);
++
++	phys_addr_t phys_ram_base = memblock_start_of_DRAM();
++	phys_addr_t phys_ram_end = memblock_end_of_DRAM();
++
++	min_low_pfn = PFN_UP(phys_ram_base);
++	max_low_pfn = max_pfn = PFN_DOWN(phys_ram_end);
++
++	reserve_initrd_mem();
++	early_init_fdt_scan_reserved_mem();
++
++	dma_contiguous_reserve(max(4UL * SZ_1G,
++				   (unsigned long)PFN_PHYS(max_low_pfn)));
++}
++
++static void __meminit create_linear_mapping_range(phys_addr_t start,
++						  phys_addr_t end)
++{
++	pgd_t *pgdp = swapper_pg_dir;
++
++	uintptr_t vhead = (uintptr_t)__va(start);
++	uintptr_t vtail = (uintptr_t)__va(end - 1);
++
++	uintptr_t pgd_head = pgd_index(vhead);
++	uintptr_t pte_head = pte_index(vhead);
++
++	uintptr_t pgd_tail = pgd_index(vtail);
++	uintptr_t pte_tail = pte_index(vtail);
++
++	for (uintptr_t pgd_idx = pgd_head; pgd_idx <= pgd_tail; pgd_idx++) {
++		uintptr_t cur_pte_tail;
++
++		if (pgd_idx != pgd_tail)
++			cur_pte_tail = PTRS_PER_PTE - 1;
++		else
++			cur_pte_tail = pte_tail;
++
++		clear_fixmap(FIX_PTE);
++
++		phys_addr_t pte_phys;
++		pte_t *ptep;
++
++		if (pgd_val(pgdp[pgd_idx]) == 0) {
++			pte_phys = memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE);
++			pgdp[pgd_idx] = pfn_pgd(PFN_DOWN(pte_phys), PAGE_TABLE);
++			ptep = (pte_t *)set_fixmap_offset(FIX_PTE, pte_phys);
++			memset(ptep, 0, PAGE_SIZE);
++		} else {
++			ptep = (pte_t *)set_fixmap_offset(FIX_PTE, pte_phys);
++		}
++
++		for (uintptr_t pte_idx = pte_head; pte_idx <= cur_pte_tail;
++		     pte_idx++) {
++			ptep[pte_idx] = pfn_pte(start, PAGE_KERNEL_EXEC);
++			start += PAGE_SIZE;
++		}
++
++		pte_head = 0;
++	}
++}
++
++static void __init create_linear_mapping_page_table(void)
++{
++	phys_addr_t start, end;
++	u64 i;
++
++	for_each_mem_range(i, &start, &end) {
++		if (start >= end)
++			break;
++		if (start <= __pa(PAGE_OFFSET) && __pa(PAGE_OFFSET) < end)
++			start = __pa(PAGE_OFFSET);
++
++		create_linear_mapping_range(start, end);
++	}
++}
++
++static void __init setup_vm_final(void)
++{
++	create_linear_mapping_page_table();
++
++	clear_fixmap(FIX_PTE);
++
++	local_flush_tlb_all();
++}
++
++void __init paging_init(void)
++{
++	setup_bootmem();
++	setup_vm_final();
++	memblock_allow_resize();
++	memblock_dump_all();
 +}
 diff -urN --no-dereference linux-clean/drivers/tty/serial/Kconfig linux-workdir/drivers/tty/serial/Kconfig
 --- linux-clean/drivers/tty/serial/Kconfig
