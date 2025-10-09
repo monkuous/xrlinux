@@ -904,7 +904,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/pgalloc.h linux-
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/pgtable.h linux-workdir/arch/xr17032/include/asm/pgtable.h
 --- linux-clean/arch/xr17032/include/asm/pgtable.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/pgtable.h
-@@ -0,0 +1,303 @@
+@@ -0,0 +1,304 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -1204,6 +1204,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/pgtable.h linux-
 +extern uintptr_t _dtb_early_pa;
 +
 +void paging_init(void);
++void misc_mem_init(void);
 +
 +#endif /* !defined(__ASSEMBLER__) */
 +
@@ -2185,7 +2186,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/setup.c linux-workdir/arch/xr17032/kernel/setup.c
 --- linux-clean/arch/xr17032/kernel/setup.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/setup.c
-@@ -0,0 +1,48 @@
+@@ -0,0 +1,49 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -2231,6 +2232,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/setup.c linux-workdir
 +	paging_init();
 +
 +	unflatten_device_tree();
++	misc_mem_init();
 +
 +	panic("TODO setup_arch");
 +}
@@ -2552,7 +2554,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/mm/Makefile linux-workdir/ar
 diff -urN --no-dereference linux-clean/arch/xr17032/mm/init.c linux-workdir/arch/xr17032/mm/init.c
 --- linux-clean/arch/xr17032/mm/init.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/mm/init.c
-@@ -0,0 +1,211 @@
+@@ -0,0 +1,235 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -2568,6 +2570,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/mm/init.c linux-workdir/arch
 +#include <linux/memblock.h>
 +#include <linux/minmax.h>
 +#include <linux/mm.h>
++#include <linux/mmzone.h>
 +#include <linux/of_fdt.h>
 +
 +void *_dtb_early_va;
@@ -2598,6 +2601,8 @@ diff -urN --no-dereference linux-clean/arch/xr17032/mm/init.c linux-workdir/arch
 +};
 +
 +DECLARE_VM_GET_PAGE_PROT
++
++phys_addr_t dma32_phys_limit;
 +
 +void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot)
 +{
@@ -2682,8 +2687,10 @@ diff -urN --no-dereference linux-clean/arch/xr17032/mm/init.c linux-workdir/arch
 +	reserve_initrd_mem();
 +	early_init_fdt_scan_reserved_mem();
 +
-+	dma_contiguous_reserve(max(4UL * SZ_1G,
-+				   (unsigned long)PFN_PHYS(max_low_pfn)));
++	dma32_phys_limit = max(4UL * SZ_1G,
++			       (unsigned long)PFN_PHYS(max_low_pfn));
++
++	dma_contiguous_reserve(dma32_phys_limit);
 +}
 +
 +static void __meminit create_linear_mapping_range(phys_addr_t start,
@@ -2762,6 +2769,25 @@ diff -urN --no-dereference linux-clean/arch/xr17032/mm/init.c linux-workdir/arch
 +	setup_bootmem();
 +	setup_vm_final();
 +	memblock_allow_resize();
++}
++
++static void __init zone_sizes_init(void)
++{
++	unsigned long max_zone_pfns[MAX_NR_ZONES] = { 0, };
++
++#ifdef CONFIG_ZONE_DMA32
++	max_zone_pfns[ZONE_DMA32] = PFN_DOWN(dma32_phys_limit);
++#endif
++	max_zone_pfns[ZONE_NORMAL] = max_low_pfn;
++
++	free_area_init(max_zone_pfns);
++}
++
++void __init misc_mem_init(void)
++{
++	early_memtest(min_low_pfn << PAGE_SHIFT, max_low_pfn << PAGE_SHIFT);
++	sparse_init();
++	zone_sizes_init();
 +	memblock_dump_all();
 +}
 diff -urN --no-dereference linux-clean/drivers/tty/serial/Kconfig linux-workdir/drivers/tty/serial/Kconfig
