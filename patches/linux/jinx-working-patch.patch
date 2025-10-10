@@ -1918,7 +1918,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/uapi/asm/sigcontext.
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/Makefile linux-workdir/arch/xr17032/kernel/Makefile
 --- linux-clean/arch/xr17032/kernel/Makefile	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/Makefile
-@@ -0,0 +1,13 @@
+@@ -0,0 +1,14 @@
 +# SPDX-License-Identifier: GPL-2.0-only
 +#
 +# Makefile for the XR/17032 Linux kernel
@@ -1929,6 +1929,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/Makefile linux-workdi
 +obj-y	+= head.o
 +obj-y	+= irq.o
 +obj-y	+= setup.o
++obj-y	+= time.o
 +
 +obj-y	+= asm-stubs.o
 +obj-y	+= stubs.o
@@ -2384,7 +2385,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/setup.c linux-workdir
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/stubs.c linux-workdir/arch/xr17032/kernel/stubs.c
 --- linux-clean/arch/xr17032/kernel/stubs.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/stubs.c
-@@ -0,0 +1,110 @@
+@@ -0,0 +1,105 @@
 +#include <asm/mmu_context.h>
 +#include <asm/page.h>
 +#include <asm/pgtable.h>
@@ -2490,10 +2491,23 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/stubs.c linux-workdir
 +{
 +	panic("TODO switch_mm");
 +}
+diff -urN --no-dereference linux-clean/arch/xr17032/kernel/time.c linux-workdir/arch/xr17032/kernel/time.c
+--- linux-clean/arch/xr17032/kernel/time.c	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/kernel/time.c
+@@ -0,0 +1,14 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2025 monkuous
++ */
++
++#include <linux/clocksource.h>
++#include <linux/init.h>
++#include <linux/of_clk.h>
 +
 +void __init time_init(void)
 +{
-+	panic("TODO time_init");
++	of_clk_init(NULL);
++	timer_probe();
 +}
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/vmlinux.lds.S linux-workdir/arch/xr17032/kernel/vmlinux.lds.S
 --- linux-clean/arch/xr17032/kernel/vmlinux.lds.S	1970-01-01 01:00:00.000000000 +0100
