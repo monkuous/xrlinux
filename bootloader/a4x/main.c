@@ -95,6 +95,8 @@ static void BxDtAddChosen(char *args) {
 
 static uint32_t BxCpuPhandles[BL_ARRAY_SIZE(((struct FwDeviceDatabase *)0)->Processors)];
 static uint32_t BxLsicPhandle;
+static struct BlDtNode *BxAliasesNode;
+static struct BlDtNode *BxSocNode;
 
 static void BxDtAddCpus(void) {
     auto cpus = BlDtCreateNode(nullptr, "cpus");
@@ -151,7 +153,7 @@ static struct BlDtNode *BxDtAddDevice(
     char buffer[32];
     BlPrintToBuffer(buffer, sizeof(buffer), "%s@%zx", name, address);
 
-    auto node = BlDtCreateNode(nullptr, buffer);
+    auto node = BlDtCreateNode(BxSocNode, buffer);
     uint32_t reg[] = {address, size};
 
     BlDtAddPropertyU32s(node, "reg", reg, BL_ARRAY_SIZE(reg));
@@ -166,8 +168,6 @@ static void BxDtAddRtc(void) {
 }
 
 static void BxDtAddSerial(void) {
-    auto aliases = BlDtCreateNode(nullptr, "aliases");
-
     for (size_t i = 0; i < BX_SERIAL_COUNT; i++) {
         auto node = BxDtAddDevice("serial", "xrarch,serial", BX_SERIAL_BASE(i), BX_SERIAL_SIZE, BX_SERIAL_IRQ(i), 1);
         BlDtAddPropertyU32(node, "clock-frequency", BX_SERIAL_BAUD);
@@ -177,7 +177,7 @@ static void BxDtAddSerial(void) {
         BlPrintToBuffer(alias, sizeof(alias), "serial%zu", i);
 
         char *path = BlDtNodePath(node);
-        BlDtAddPropertyString(aliases, alias, path);
+        BlDtAddPropertyString(BxAliasesNode, alias, path);
         BlFreeHeap(path);
     }
 }
@@ -203,7 +203,7 @@ static void BxDtAddLsic(void) {
     char buffer[32];
     BlPrintToBuffer(buffer, sizeof(buffer), "lsic@%zx", (size_t)BX_LSIC_BASE);
 
-    auto node = BlDtCreateNode(nullptr, buffer);
+    auto node = BlDtCreateNode(BxSocNode, buffer);
     uint32_t reg[] = {BX_LSIC_BASE, BX_LSIC_SIZE};
 
     BlDtAddPropertyU32(node, "phandle", BxLsicPhandle);
@@ -239,6 +239,14 @@ static void BxDtAddBoards(void) {
     }
 }
 
+static void BxDtCreateSocNode(void) {
+    BxSocNode = BlDtCreateNode(nullptr, "soc");
+    BlDtAddPropertyU32(BxSocNode, "#address-cells", 1);
+    BlDtAddPropertyU32(BxSocNode, "#size-cells", 1);
+    BlDtAddPropertyString(BxSocNode, "compatible", "simple-bus");
+    BlDtAddProperty(BxSocNode, "ranges", nullptr, 0);
+}
+
 static void BxDtPopulate(char *args) {
     BlPrint("Populating device tree\n");
 
@@ -253,9 +261,13 @@ static void BxDtPopulate(char *args) {
     default: BlCrash("unknown machine type"); break;
     }
 
-    BxDtAddMemory();
+    BxAliasesNode = BlDtCreateNode(nullptr, "aliases");
     BxDtAddChosen(args);
+
+    BxDtAddMemory();
     BxDtAddCpus();
+
+    BxDtCreateSocNode();
     BxDtAddLsic();
     BxDtAddRtc();
     BxDtAddSerial();
