@@ -10,7 +10,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/Kbuild linux-workdir/arch/xr
 diff -urN --no-dereference linux-clean/arch/xr17032/Kconfig linux-workdir/arch/xr17032/Kconfig
 --- linux-clean/arch/xr17032/Kconfig	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/Kconfig
-@@ -0,0 +1,35 @@
+@@ -0,0 +1,38 @@
 +# SPDX-License-Identifier: GPL-2.0-only
 +
 +config XR17032
@@ -28,6 +28,9 @@ diff -urN --no-dereference linux-clean/arch/xr17032/Kconfig linux-workdir/arch/x
 +	select OF
 +	select OF_EARLY_FLATTREE
 +	select GENERIC_EARLY_IOREMAP
++	select GENERIC_IRQ_MULTI_HANDLER
++	select XR17032_INTC
++	select XRARCH_LSIC
 +
 +config MMU
 +	def_bool y
@@ -608,7 +611,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/fixmap.h linux-w
 +	FIX_HOLE,
 +
 +	FIX_EARLYCON_MEM_BASE,
-+	FIX_PTE,
++	FIX_TEMP,
 +
 +	__end_of_permanent_fixed_addresses,
 +	/*
@@ -1340,6 +1343,37 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/set_memory.h lin
 +#define SECTION_ALIGN L1_CACHE_BYTES
 +
 +#endif /* _ASM_XR17032_SET_MEMORY_H */
+diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/smp.h linux-workdir/arch/xr17032/include/asm/smp.h
+--- linux-clean/arch/xr17032/include/asm/smp.h	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/include/asm/smp.h
+@@ -0,0 +1,27 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2025 monkuous
++ */
++
++#ifndef _ASM_XR17032_SMP_H
++#define _ASM_XR17032_SMP_H
++
++#include <asm/errno.h>
++
++extern unsigned long boot_cpu_hwid;
++
++#ifdef CONFIG_SMP
++#error "TODO"
++#else
++
++static inline int xr17032_cpu_hwid_to_cpuid(unsigned long cpu_hwid)
++{
++	if (cpu_hwid == boot_cpu_hwid)
++		return 0;
++
++	return -ENOENT;
++}
++
++#endif /* CONFIG_SMP */
++
++#endif /* _ASM_XR17032_SMP_H */
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/sparsemem.h linux-workdir/arch/xr17032/include/asm/sparsemem.h
 --- linux-clean/arch/xr17032/include/asm/sparsemem.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/sparsemem.h
@@ -1884,7 +1918,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/uapi/asm/sigcontext.
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/Makefile linux-workdir/arch/xr17032/kernel/Makefile
 --- linux-clean/arch/xr17032/kernel/Makefile	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/Makefile
-@@ -0,0 +1,12 @@
+@@ -0,0 +1,13 @@
 +# SPDX-License-Identifier: GPL-2.0-only
 +#
 +# Makefile for the XR/17032 Linux kernel
@@ -1893,6 +1927,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/Makefile linux-workdi
 +always-$(KBUILD_BUILTIN)	+= vmlinux.lds
 +
 +obj-y	+= head.o
++obj-y	+= irq.o
 +obj-y	+= setup.o
 +
 +obj-y	+= asm-stubs.o
@@ -1942,7 +1977,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/asm-stubs.S linux-wor
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/arch/xr17032/kernel/head.S
 --- linux-clean/arch/xr17032/kernel/head.S	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/head.S
-@@ -0,0 +1,241 @@
+@@ -0,0 +1,247 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -2150,6 +2185,12 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/
 +	# only continue on cpu0
 +	bne a0, .Lpark_cpu
 +
++	# set up boot_cpu_hwid
++	lui t0, zero, boot_cpu_hwid
++	ori t0, t0, boot_cpu_hwid
++	mfcr t1, whami
++	mov long [t0], t1
++
 +	# set up c environment
 +	lui tp, zero, init_task
 +	ori tp, tp, init_task
@@ -2184,10 +2225,30 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/
 +SYM_DATA_START_LOCAL(num_started_cpus)
 +	.space 4
 +SYM_DATA_END(num_started_cpus)
+diff -urN --no-dereference linux-clean/arch/xr17032/kernel/irq.c linux-workdir/arch/xr17032/kernel/irq.c
+--- linux-clean/arch/xr17032/kernel/irq.c	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/kernel/irq.c
+@@ -0,0 +1,16 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2025 monkuous
++ */
++
++#include <linux/init.h>
++#include <linux/irq.h>
++#include <linux/irqchip.h>
++#include <linux/panic.h>
++
++void __init init_IRQ(void)
++{
++	irqchip_init();
++	if (!handle_arch_irq)
++		panic("No interrupt controller found.");
++}
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/setup.c linux-workdir/arch/xr17032/kernel/setup.c
 --- linux-clean/arch/xr17032/kernel/setup.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/setup.c
-@@ -0,0 +1,129 @@
+@@ -0,0 +1,132 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -2196,6 +2257,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/setup.c linux-workdir
 +#include <asm/early_ioremap.h>
 +#include <asm/pgtable.h>
 +#include <asm/sections.h>
++#include <asm/smp.h>
 +#include <linux/memblock.h>
 +#include <linux/mm.h>
 +#include <linux/init.h>
@@ -2203,6 +2265,8 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/setup.c linux-workdir
 +#include <linux/of_fdt.h>
 +#include <linux/panic.h>
 +#include <linux/printk.h>
++
++unsigned long boot_cpu_hwid;
 +
 +static void __init parse_dtb(void)
 +{
@@ -2320,7 +2384,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/setup.c linux-workdir
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/stubs.c linux-workdir/arch/xr17032/kernel/stubs.c
 --- linux-clean/arch/xr17032/kernel/stubs.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/stubs.c
-@@ -0,0 +1,115 @@
+@@ -0,0 +1,110 @@
 +#include <asm/mmu_context.h>
 +#include <asm/page.h>
 +#include <asm/pgtable.h>
@@ -2384,11 +2448,6 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/stubs.c linux-workdir
 +unsigned long __get_wchan(struct task_struct *task)
 +{
 +	panic("TODO __get_wchan");
-+}
-+
-+void __init init_IRQ(void)
-+{
-+	panic("TODO init_IRQ");
 +}
 +
 +void machine_halt(void)
@@ -2635,7 +2694,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/mm/Makefile linux-workdir/ar
 diff -urN --no-dereference linux-clean/arch/xr17032/mm/init.c linux-workdir/arch/xr17032/mm/init.c
 --- linux-clean/arch/xr17032/mm/init.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/mm/init.c
-@@ -0,0 +1,235 @@
+@@ -0,0 +1,233 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -2796,18 +2855,16 @@ diff -urN --no-dereference linux-clean/arch/xr17032/mm/init.c linux-workdir/arch
 +		else
 +			cur_pte_tail = pte_tail;
 +
-+		clear_fixmap(FIX_PTE);
-+
 +		phys_addr_t pte_phys;
 +		pte_t *ptep;
 +
 +		if (pgd_val(pgdp[pgd_idx]) == 0) {
 +			pte_phys = memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE);
 +			pgdp[pgd_idx] = pfn_pgd(PFN_DOWN(pte_phys), PAGE_TABLE);
-+			ptep = (pte_t *)set_fixmap_offset(FIX_PTE, pte_phys);
++			ptep = (pte_t *)set_fixmap_offset(FIX_TEMP, pte_phys);
 +			memset(ptep, 0, PAGE_SIZE);
 +		} else {
-+			ptep = (pte_t *)set_fixmap_offset(FIX_PTE, pte_phys);
++			ptep = (pte_t *)set_fixmap_offset(FIX_TEMP, pte_phys);
 +		}
 +
 +		for (uintptr_t pte_idx = pte_head; pte_idx <= cur_pte_tail;
@@ -2816,6 +2873,8 @@ diff -urN --no-dereference linux-clean/arch/xr17032/mm/init.c linux-workdir/arch
 +			ptep[pte_idx] = pfn_pte(pfn, PAGE_KERNEL_EXEC);
 +			start += PAGE_SIZE;
 +		}
++
++		clear_fixmap(FIX_TEMP);
 +
 +		pte_head = 0;
 +	}
@@ -2839,8 +2898,6 @@ diff -urN --no-dereference linux-clean/arch/xr17032/mm/init.c linux-workdir/arch
 +static void __init setup_vm_final(void)
 +{
 +	create_linear_mapping_page_table();
-+
-+	clear_fixmap(FIX_PTE);
 +
 +	local_flush_tlb_all();
 +}
@@ -2871,6 +2928,260 @@ diff -urN --no-dereference linux-clean/arch/xr17032/mm/init.c linux-workdir/arch
 +	zone_sizes_init();
 +	memblock_dump_all();
 +}
+diff -urN --no-dereference linux-clean/drivers/irqchip/Kconfig linux-workdir/drivers/irqchip/Kconfig
+--- linux-clean/drivers/irqchip/Kconfig
++++ linux-workdir/drivers/irqchip/Kconfig
+@@ -794,4 +794,14 @@
+ 	  chained controller, routing all interrupt source in P-Chip to
+ 	  the primary controller on C-Chip.
+ 
++config XR17032_INTC
++	bool
++	depends on XR17032
++	select IRQ_DOMAIN_HIERARCHY
++
++config XRARCH_LSIC
++	bool
++	depends on XR17032
++	select IRQ_DOMAIN_HIERARCHY
++
+ endmenu
+diff -urN --no-dereference linux-clean/drivers/irqchip/Makefile linux-workdir/drivers/irqchip/Makefile
+--- linux-clean/drivers/irqchip/Makefile
++++ linux-workdir/drivers/irqchip/Makefile
+@@ -132,3 +132,5 @@
+ obj-$(CONFIG_MCHP_EIC)			+= irq-mchp-eic.o
+ obj-$(CONFIG_SOPHGO_SG2042_MSI)		+= irq-sg2042-msi.o
+ obj-$(CONFIG_SUNPLUS_SP7021_INTC)	+= irq-sp7021-intc.o
++obj-$(CONFIG_XR17032_INTC)		+= irq-xr17032-intc.o
++obj-$(CONFIG_XRARCH_LSIC)		+= irq-xrarch-lsic.o
+diff -urN --no-dereference linux-clean/drivers/irqchip/irq-xr17032-intc.c linux-workdir/drivers/irqchip/irq-xr17032-intc.c
+--- linux-clean/drivers/irqchip/irq-xr17032-intc.c	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/drivers/irqchip/irq-xr17032-intc.c
+@@ -0,0 +1,106 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2025 monkuous
++ */
++
++#define pr_fmt(fmt) "xr17032-intc: " fmt
++#include <asm/smp.h>
++#include <linux/fwnode.h>
++#include <linux/init.h>
++#include <linux/irq.h>
++#include <linux/irqchip.h>
++#include <linux/irqdomain.h>
++#include <linux/of.h>
++#include <linux/smp.h>
++
++#define INTC_IRQS 16
++
++static struct irq_domain *xr17032_intc_domain;
++
++static void xr17032_intc_irq(struct pt_regs *regs)
++{
++	unsigned long cause = regs->rs >> 28;
++
++	if (generic_handle_domain_irq(xr17032_intc_domain, cause))
++		pr_warn_ratelimited("failed to handle interrupt (cause: %lu)\n",
++				    cause);
++}
++
++static struct irq_chip xr17032_intc_chip = {
++	.name	= "XR/17032 INTC",
++};
++
++static int xr17032_intc_domain_map(struct irq_domain *d, unsigned int irq,
++				   irq_hw_number_t hwirq)
++{
++	struct irq_chip *chip = d->host_data;
++
++	irq_set_percpu_devid(irq);
++	irq_domain_set_info(d, irq, hwirq, chip, NULL, handle_percpu_devid_irq,
++			    NULL, NULL);
++
++	return 0;
++}
++
++static int xr17032_intc_domain_alloc(struct irq_domain *domain,
++				     unsigned int virq, unsigned int nr_irqs,
++				     void *arg)
++{
++	struct irq_fwspec *fwspec = arg;
++	irq_hw_number_t hwirq;
++	unsigned int type = IRQ_TYPE_NONE;
++
++	int ret = irq_domain_translate_onecell(domain, fwspec, &hwirq, &type);
++	if (ret)
++		return ret;
++
++	if (hwirq + nr_irqs >= INTC_IRQS)
++		return -EINVAL;
++
++	for (unsigned int i = 0; i < nr_irqs; i++) {
++		ret = xr17032_intc_domain_map(domain, virq + i, hwirq + i);
++		if (ret)
++			return ret;
++	}
++
++	return 0;
++}
++
++static const struct irq_domain_ops xr17032_intc_domain_ops = {
++	.map	= xr17032_intc_domain_map,
++	.xlate	= irq_domain_xlate_onecell,
++	.alloc	= xr17032_intc_domain_alloc,
++};
++
++static int __init xr17032_intc_init(struct device_node *node,
++				    struct device_node *parent)
++{
++	struct irq_chip *chip = &xr17032_intc_chip;
++
++	unsigned long cpu_hwid = of_get_cpu_hwid(node, 0);
++	if (cpu_hwid == ~0UL) {
++		pr_warn("unable to find cpu hwid for %pOF\n", node);
++		return 0;
++	}
++
++	struct fwnode_handle *fn = of_fwnode_handle(node);
++
++	if (xr17032_cpu_hwid_to_cpuid(cpu_hwid) != smp_processor_id()) {
++		fwnode_dev_initialized(fn, true);
++		return 0;
++	}
++
++	xr17032_intc_domain = irq_domain_create_linear(fn, INTC_IRQS,
++						       &xr17032_intc_domain_ops,
++						       chip);
++
++	int rc = set_handle_irq(&xr17032_intc_irq);
++	if (rc) {
++		pr_err("failed to set irq handler\n");
++		return rc;
++	}
++
++	return 0;
++}
++
++IRQCHIP_DECLARE(xr17032_intc, "xrarch,xr17032", xr17032_intc_init);
+diff -urN --no-dereference linux-clean/drivers/irqchip/irq-xrarch-lsic.c linux-workdir/drivers/irqchip/irq-xrarch-lsic.c
+--- linux-clean/drivers/irqchip/irq-xrarch-lsic.c	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/drivers/irqchip/irq-xrarch-lsic.c
+@@ -0,0 +1,113 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2025 monkuous
++ */
++
++#define pr_fmt(fmt) "xrarch-lsic: " fmt
++#include <asm/fixmap.h>
++#include <linux/init.h>
++#include <linux/irq.h>
++#include <linux/irqchip.h>
++#include <linux/irqdomain.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/platform_device.h>
++
++#define LSIC_IRQS 64
++
++#define LSIC_DISA0(i) (0x20 * (i) + 0x00)
++#define LSIC_DISA1(i) (0x20 * (i) + 0x04)
++#define LSIC_PEND0(i) (0x20 * (i) + 0x08)
++#define LSIC_PEND1(i) (0x20 * (i) + 0x0c)
++#define LSIC_COMPL(i) (0x20 * (i) + 0x10)
++#define LSIC_CLAIM(i) (0x20 * (i) + 0x10)
++#define LSIC_IPL(i) (0x20 * (i) + 0x14)
++
++static const struct of_device_id lsic_match[] = {
++	{ .compatible = "xrarch,lsic" },
++	{}
++};
++
++static int lsic_probe(struct fwnode_handle *fwnode)
++{
++	// TODO
++	/*struct device_node *device = to_of_node(fwnode);
++
++	void __iomem *regs = of_iomap(device, 0);
++	if (!regs)
++		return -ENOMEM;
++
++	u32 nr_cpus = of_irq_count(device);
++	if (WARN_ON(nr_cpus)) {
++		pr_err("%pfwP: no upstream cpus available\n", fwnode);
++		return -EINVAL;
++	}*/
++
++	pr_err("TODO lsic_probe");
++	return -ENXIO;
++}
++
++static int lsic_platform_probe(struct platform_device *pdev)
++{
++	return lsic_probe(pdev->dev.fwnode);
++}
++
++static struct platform_driver lsic_driver = {
++	.driver = {
++		.name			= "xrarch-lsic",
++		.of_match_table		= lsic_match,
++		.suppress_bind_attrs	= true,
++	},
++	.probe = lsic_platform_probe,
++};
++builtin_platform_driver(lsic_driver);
++
++static void __init mask_all_irqs(phys_addr_t start, u32 nr_cpus)
++{
++	phys_addr_t current = start & PAGE_MASK;
++	__set_fixmap(FIX_TEMP, current, PAGE_KERNEL_IO);
++
++	uintptr_t rvpage = __fix_to_virt(FIX_TEMP);
++
++	for (u32 cpu = 0; cpu < nr_cpus; cpu++) {
++		for (int i = 0; i < 2; i++) {
++			phys_addr_t rhead = start + LSIC_DISA0(cpu) + i * 4;
++			phys_addr_t rpage = rhead & PAGE_MASK;
++
++			if (rpage != current) {
++				clear_fixmap(FIX_TEMP);
++				__set_fixmap(FIX_TEMP, rpage, PAGE_KERNEL_IO);
++				current = rpage;
++			}
++
++			uintptr_t rvirt = rvpage + (rhead & ~PAGE_MASK);
++			u32 __iomem *reg = (void __iomem *)rvirt;
++			writel(~0UL, reg);
++		}
++	}
++
++	clear_fixmap(FIX_TEMP);
++}
++
++static int __init lsic_early_init(struct device_node *node,
++				  struct device_node *parent)
++{
++	u32 nr_cpus = of_irq_count(node);
++	if (WARN_ON(!nr_cpus)) {
++		pr_err("no upstream cpus for %pOF\n", node);
++		return -EINVAL;
++	}
++
++	struct resource r;
++
++	int ret = of_address_to_resource(node, 0, &r);
++	if (ret) {
++		pr_err("can't get address from device node %pOF\n", node);
++	}
++
++	mask_all_irqs(r.start, nr_cpus);
++	return 0;
++}
++
++IRQCHIP_DECLARE(xrarch_lsic, "xrarch,lsic", lsic_early_init);
 diff -urN --no-dereference linux-clean/drivers/tty/serial/Kconfig linux-workdir/drivers/tty/serial/Kconfig
 --- linux-clean/drivers/tty/serial/Kconfig
 +++ linux-workdir/drivers/tty/serial/Kconfig
