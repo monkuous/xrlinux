@@ -1787,7 +1787,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gc
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/gcc/config/xr17032/xr17032.md
 --- gcc-clean/gcc/config/xr17032/xr17032.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.md
-@@ -0,0 +1,746 @@
+@@ -0,0 +1,744 @@
 +;; Machine description for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -1904,8 +1904,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +	operands[1] = reg;
 +    }
 +  else if (MEM_P (operands[0])
-+      && !(register_operand (operands[1], <MODE>mode)
-+	   || xr17032_tinyimm_operand (operands[1], <MODE>mode)))
++      && !register_operand (operands[1], <MODE>mode))
 +    {
 +      gcc_assert (!(reload_in_progress || reload_completed));
 +      rtx reg = gen_reg_rtx (<MODE>mode);
@@ -1915,11 +1914,10 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +})
 +
 +(define_insn "*mov<mode>"
-+  [(set (match_operand:MEMORY 0 "nonimmediate_operand" "=r,r,r,r, m")
-+        (match_operand:MEMORY 1 "xr17032_move_operand" " r,I,P,m,rK"))]
++  [(set (match_operand:MEMORY 0 "nonimmediate_operand" "=r,r,r,r,m")
++        (match_operand:MEMORY 1 "xr17032_move_operand" " r,I,P,m,r"))]
 +  "register_operand (operands[0], <MODE>mode)
-+    || register_operand (operands[1], <MODE>mode)
-+    || xr17032_tinyimm_operand (operands[1], <MODE>mode)"
++    || register_operand (operands[1], <MODE>mode)"
 +  "@
 +   add\t%0,%1,zero
 +   addi\t%0,zero,%1
