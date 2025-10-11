@@ -1,0 +1,20 @@
+#! /bin/sh
+
+name=init
+version=0
+revision=1
+skip_pkg_check=yes
+hostdeps="binutils gcc-bootstrap"
+imagedeps="build-essential"
+
+build() {
+    "${TRIPLE}-gcc" -ffreestanding -fno-pic -static -nostdlib -o init -x c - << EOF
+void _start(void) {
+    asm volatile("1: beq zero, 1b");
+}
+EOF
+}
+
+package() {
+    install -Dm755 init "${dest_dir}/usr/bin/init"
+}

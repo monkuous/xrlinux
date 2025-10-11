@@ -1,0 +1,11 @@
+#! /bin/sh
+
+name=base-files
+version=0
+revision=1
+skip_pkg_check=yes
+source_dir=base-files
+
+package() {
+    cp -rp "${source_dir}/." "${dest_dir}"
+}
