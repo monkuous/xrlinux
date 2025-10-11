@@ -10,7 +10,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/Kbuild linux-workdir/arch/xr
 diff -urN --no-dereference linux-clean/arch/xr17032/Kconfig linux-workdir/arch/xr17032/Kconfig
 --- linux-clean/arch/xr17032/Kconfig	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/Kconfig
-@@ -0,0 +1,44 @@
+@@ -0,0 +1,45 @@
 +# SPDX-License-Identifier: GPL-2.0-only
 +
 +config XR17032
@@ -37,6 +37,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/Kconfig linux-workdir/arch/x
 +	select GENERIC_CPU_DEVICES
 +	select GENERIC_LIB_ASHRDI3
 +	select LOCK_MM_AND_FIND_VMA
++	select ARCH_HAS_SYSCALL_WRAPPER
 +
 +config MMU
 +	def_bool y
@@ -139,8 +140,10 @@ diff -urN --no-dereference linux-clean/arch/xr17032/configs/xr17032_defconfig li
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/Kbuild linux-workdir/arch/xr17032/include/asm/Kbuild
 --- linux-clean/arch/xr17032/include/asm/Kbuild	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/Kbuild
-@@ -0,0 +1,6 @@
+@@ -0,0 +1,8 @@
 +# SPDX-License-Identifier: GPL-2.0
++syscall-y += syscall_table_32.h
++
 +generic-y += string.h
 +generic-y += user.h
 +generic-y += kvm_para.h
@@ -730,38 +733,38 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/gpr-num.h linux-
 +#define _ASM_XR17032_GPR_NUM_H
 +
 +#define __DEFINE_ASM_GPR_NUMS					\
-+"	.equ	.L__gpr_num_zero,	0\n"			\
-+"	.equ	.L__gpr_num_t0,		1\n"			\
-+"	.equ	.L__gpr_num_t1,		2\n"			\
-+"	.equ	.L__gpr_num_t2,		3\n"			\
-+"	.equ	.L__gpr_num_t3,		4\n"			\
-+"	.equ	.L__gpr_num_t4,		5\n"			\
-+"	.equ	.L__gpr_num_t5,		6\n"			\
-+"	.equ	.L__gpr_num_a0,		7\n"			\
-+"	.equ	.L__gpr_num_a1,		8\n"			\
-+"	.equ	.L__gpr_num_a2,		9\n"			\
-+"	.equ	.L__gpr_num_a3,		10\n"			\
-+"	.equ	.L__gpr_num_s0,		11\n"			\
-+"	.equ	.L__gpr_num_s1,		12\n"			\
-+"	.equ	.L__gpr_num_s2,		13\n"			\
-+"	.equ	.L__gpr_num_s3,		14\n"			\
-+"	.equ	.L__gpr_num_s4,		15\n"			\
-+"	.equ	.L__gpr_num_s5,		16\n"			\
-+"	.equ	.L__gpr_num_s6,		17\n"			\
-+"	.equ	.L__gpr_num_s7,		18\n"			\
-+"	.equ	.L__gpr_num_s8,		19\n"			\
-+"	.equ	.L__gpr_num_s9,		20\n"			\
-+"	.equ	.L__gpr_num_s10,	21\n"			\
-+"	.equ	.L__gpr_num_s11,	22\n"			\
-+"	.equ	.L__gpr_num_s12,	23\n"			\
-+"	.equ	.L__gpr_num_s13,	24\n"			\
-+"	.equ	.L__gpr_num_s14,	25\n"			\
-+"	.equ	.L__gpr_num_s15,	26\n"			\
-+"	.equ	.L__gpr_num_s16,	27\n"			\
-+"	.equ	.L__gpr_num_t17,	28\n"			\
-+"	.equ	.L__gpr_num_tp,		29\n"			\
-+"	.equ	.L__gpr_num_sp,		30\n"			\
-+"	.equ	.L__gpr_num_lr,		31\n"
++"	.equ	.L__gpr_num_zero,	31\n"			\
++"	.equ	.L__gpr_num_t0,		0\n"			\
++"	.equ	.L__gpr_num_t1,		1\n"			\
++"	.equ	.L__gpr_num_t2,		2\n"			\
++"	.equ	.L__gpr_num_t3,		3\n"			\
++"	.equ	.L__gpr_num_t4,		4\n"			\
++"	.equ	.L__gpr_num_t5,		5\n"			\
++"	.equ	.L__gpr_num_a0,		6\n"			\
++"	.equ	.L__gpr_num_a1,		7\n"			\
++"	.equ	.L__gpr_num_a2,		8\n"			\
++"	.equ	.L__gpr_num_a3,		9\n"			\
++"	.equ	.L__gpr_num_s0,		10\n"			\
++"	.equ	.L__gpr_num_s1,		11\n"			\
++"	.equ	.L__gpr_num_s2,		12\n"			\
++"	.equ	.L__gpr_num_s3,		13\n"			\
++"	.equ	.L__gpr_num_s4,		14\n"			\
++"	.equ	.L__gpr_num_s5,		15\n"			\
++"	.equ	.L__gpr_num_s6,		16\n"			\
++"	.equ	.L__gpr_num_s7,		17\n"			\
++"	.equ	.L__gpr_num_s8,		18\n"			\
++"	.equ	.L__gpr_num_s9,		19\n"			\
++"	.equ	.L__gpr_num_s10,	20\n"			\
++"	.equ	.L__gpr_num_s11,	21\n"			\
++"	.equ	.L__gpr_num_s12,	22\n"			\
++"	.equ	.L__gpr_num_s13,	23\n"			\
++"	.equ	.L__gpr_num_s14,	24\n"			\
++"	.equ	.L__gpr_num_s15,	25\n"			\
++"	.equ	.L__gpr_num_s16,	26\n"			\
++"	.equ	.L__gpr_num_t17,	27\n"			\
++"	.equ	.L__gpr_num_tp,		28\n"			\
++"	.equ	.L__gpr_num_sp,		29\n"			\
++"	.equ	.L__gpr_num_lr,		30\n"
 +
 +#endif /* _ASM_XR17032_GPR_NUM_H */
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/irq.h linux-workdir/arch/xr17032/include/asm/irq.h
@@ -1532,7 +1535,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/stacktrace.h lin
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/syscall.h linux-workdir/arch/xr17032/include/asm/syscall.h
 --- linux-clean/arch/xr17032/include/asm/syscall.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/syscall.h
-@@ -0,0 +1,50 @@
+@@ -0,0 +1,60 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -1541,7 +1544,10 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/syscall.h linux-
 +#ifndef _ASM_XR17032_SYSCALL_H
 +#define _ASM_XR17032_SYSCALL_H
 +
++#include <asm/ptrace.h>
 +#include <uapi/linux/audit.h>
++
++extern void * const sys_call_table[];
 +
 +static inline int syscall_get_arch(struct task_struct *task)
 +{
@@ -1582,11 +1588,83 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/syscall.h linux-
 +	return false;
 +}
 +
++typedef long (*syscall_t)(const struct pt_regs *);
++static inline void syscall_handler(struct pt_regs *regs, ulong syscall)
++{
++	syscall_t fn = sys_call_table[syscall];
++	regs->a3 = fn(regs);
++}
++
 +#endif /* _ASM_XR17032_SYSCALL_H */
+diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/syscall_wrapper.h linux-workdir/arch/xr17032/include/asm/syscall_wrapper.h
+--- linux-clean/arch/xr17032/include/asm/syscall_wrapper.h	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/include/asm/syscall_wrapper.h
+@@ -0,0 +1,61 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2025 monkuous
++ */
++
++#ifndef _ASM_XR17032_SYSCALL_WRAPPER_H
++#define _ASM_XR17032_SYSCALL_WRAPPER_H
++
++#include <asm/ptrace.h>
++
++asmlinkage long __xr17032_sys_ni_syscall(const struct pt_regs *__unused);
++
++/*
++ * Use type aliasing to ensure registers t0-t5 are correctly passed to the syscall
++ * implementation when >word-size arguments are used.
++ */
++#define __SYSCALL_SE_DEFINEx(x, prefix, name, ...)					\
++	__diag_push();									\
++	__diag_ignore(GCC, 8, "-Wattribute-alias",					\
++			"Type aliasing is used to sanitize syscall arguments");		\
++	static long __se_##prefix##name(ulong, ulong, ulong, ulong, ulong, ulong)	\
++			__attribute__((alias(__stringify(___se_##prefix##name))));	\
++	__diag_pop();									\
++	static long noinline ___se_##prefix##name(__MAP(x,__SC_LONG,__VA_ARGS__))	\
++			__used;								\
++	static long ___se_##prefix##name(__MAP(x,__SC_LONG,__VA_ARGS__))
++
++#define SC_XR17032_REGS_TO_ARGS(x, ...) \
++	regs->t0,regs->t1,regs->t2,regs->t3,regs->t4,regs->t5
++
++#define __SYSCALL_DEFINEx(x, name, ...)						\
++	asmlinkage long __xr17032_sys##name(const struct pt_regs *regs);	\
++	ALLOW_ERROR_INJECTION(__xr17032_sys_##name, ERRNO);			\
++	static inline long __do_sys##name(__MAP(x,__SC_DECL,__VA_ARGS__));	\
++	__SYSCALL_SE_DEFINEx(x, sys, name, __VA_ARGS__)				\
++	{									\
++		long ret = __do_sys##name(__MAP(x,__SC_CAST,__VA_ARGS__));	\
++		__MAP(x,__SC_TEST,__VA_ARGS__);					\
++		__PROTECT(x, ret,__MAP(x,__SC_ARGS,__VA_ARGS__));		\
++		return ret;							\
++	}									\
++	asmlinkage long __xr17032_sys##name(const struct pt_regs *regs)	\
++	{									\
++		return __se_sys##name(SC_XR17032_REGS_TO_ARGS(x,__VA_ARGS__));	\
++	}									\
++	static inline long __do_sys##name(__MAP(x,__SC_DECL,__VA_ARGS__))
++
++#define SYSCALL_DEFINE0(sname)							\
++	SYSCALL_METADATA(_##sname, 0);						\
++	asmlinkage long __xr17032_sys_##sname(const struct pt_regs *__unused);	\
++	ALLOW_ERROR_INJECTION(__xr17032_sys_##sname, ERRNO);			\
++	asmlinkage long __xr17032_sys_##sname(const struct pt_regs *__unused)
++
++#define COND_SYSCALL(name)							\
++	asmlinkage long __weak __xr17032_sys_##name(const struct pt_regs *regs);\
++	asmlinkage long __weak __xr17032_sys_##name(const struct pt_regs *regs)	\
++	{									\
++		return sys_ni_syscall();					\
++	}
++
++#endif /* _ASM_XR17032_SYSCALL_WRAPPER_H */
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/thread_info.h linux-workdir/arch/xr17032/include/asm/thread_info.h
 --- linux-clean/arch/xr17032/include/asm/thread_info.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/thread_info.h
-@@ -0,0 +1,46 @@
+@@ -0,0 +1,45 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -1606,7 +1684,6 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/thread_info.h li
 +struct thread_info {
 +	unsigned long 	flags;
 +	int		preempt_count;
-+	unsigned long	kernel_sp;
 +	unsigned long	syscall_work;
 +};
 +
@@ -1960,6 +2037,25 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/uaccess.h linux-
 +extern long __must_check strnlen_user(const char __user *str, long n);
 +
 +#endif /* _ASM_XR17032_UACCESS_H */
+diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/unistd.h linux-workdir/arch/xr17032/include/asm/unistd.h
+--- linux-clean/arch/xr17032/include/asm/unistd.h	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/include/asm/unistd.h
+@@ -0,0 +1,15 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2025 monkuous
++ */
++
++#ifndef _ASM_XR17032_UNISTD_H
++#define _ASM_XR17032_UNISTD_H
++
++#define __ARCH_WANT_SYS_CLONE
++
++#include <uapi/asm/unistd.h>
++
++#define NR_syscalls (__NR_syscalls)
++
++#endif /* _ASM_XR17032_UNISTD_H */
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/vmalloc.h linux-workdir/arch/xr17032/include/asm/vmalloc.h
 --- linux-clean/arch/xr17032/include/asm/vmalloc.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/vmalloc.h
@@ -2078,7 +2174,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/uapi/asm/ptrace.h li
 diff -urN --no-dereference linux-clean/arch/xr17032/include/uapi/asm/sigcontext.h linux-workdir/arch/xr17032/include/uapi/asm/sigcontext.h
 --- linux-clean/arch/xr17032/include/uapi/asm/sigcontext.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/uapi/asm/sigcontext.h
-@@ -0,0 +1,9 @@
+@@ -0,0 +1,21 @@
 +/* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -2087,11 +2183,64 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/uapi/asm/sigcontext.
 +#ifndef _UAPI_ASM_XR17032_SIGCONTEXT_H
 +#define _UAPI_ASM_XR17032_SIGCONTEXT_H
 +
++#include <asm/ptrace.h>
++
++/*
++ * Signal context structure
++ *
++ * This contains the context saved before a signal handler is invoked;
++ * it is restored by sys_rt_sigreturn.
++ */
++struct sigcontext {
++	struct user_regs_struct sc_regs;
++};
++
 +#endif /* _UAPI_ASM_XR17032_SIGCONTEXT_H */
+diff -urN --no-dereference linux-clean/arch/xr17032/include/uapi/asm/ucontext.h linux-workdir/arch/xr17032/include/uapi/asm/ucontext.h
+--- linux-clean/arch/xr17032/include/uapi/asm/ucontext.h	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/include/uapi/asm/ucontext.h
+@@ -0,0 +1,37 @@
++/* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
++/*
++ * Copyright (C) 2025 monkuous
++ */
++
++#ifndef _UAPI_ASM_XR17032_UCONTEXT_H
++#define _UAPI_ASM_XR17032_UCONTEXT_H
++
++#include <asm/signal.h>
++#include <linux/types.h>
++
++struct ucontext {
++	unsigned long	  uc_flags;
++	struct ucontext	 *uc_link;
++	stack_t		  uc_stack;
++	sigset_t	  uc_sigmask;
++	/*
++	 * There's some padding here to allow sigset_t to be expanded in the
++	 * future.  Though this is unlikely, other architectures put uc_sigmask
++	 * at the end of this structure and explicitly state it can be
++	 * expanded, so we didn't want to box ourselves in here.
++	 */
++	__u8		  __unused[1024 / 8 - sizeof(sigset_t)];
++	/*
++	 * We can't put uc_sigmask at the end of this structure because we need
++	 * to be able to expand sigcontext in the future.  For example, a
++	 * vector ISA extension would almost certainly add ISA state.  We want
++	 * to ensure all user-visible ISA state can be saved and restored via a
++	 * ucontext, so we're putting this at the end in order to allow for
++	 * infinite extensibility.  Since we know this will be extended and we
++	 * assume sigset_t won't be extended an extreme amount, we're
++	 * prioritizing this.
++	 */
++	struct sigcontext uc_mcontext;
++};
++
++#endif /* _UAPI_ASM_XR17032_UCONTEXT_H */
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/Makefile linux-workdir/arch/xr17032/kernel/Makefile
 --- linux-clean/arch/xr17032/kernel/Makefile	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/Makefile
-@@ -0,0 +1,17 @@
+@@ -0,0 +1,20 @@
 +# SPDX-License-Identifier: GPL-2.0-only
 +#
 +# Makefile for the XR/17032 Linux kernel
@@ -2105,6 +2254,9 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/Makefile linux-workdi
 +obj-y	+= irq.o
 +obj-y	+= process.o
 +obj-y	+= setup.o
++obj-y	+= signal.o
++obj-y	+= sys_xr17032.o
++obj-y	+= syscall_table.o
 +obj-y	+= time.o
 +
 +obj-y	+= asm-stubs.o
@@ -2112,7 +2264,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/Makefile linux-workdi
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/asm-offsets.c linux-workdir/arch/xr17032/kernel/asm-offsets.c
 --- linux-clean/arch/xr17032/kernel/asm-offsets.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/asm-offsets.c
-@@ -0,0 +1,69 @@
+@@ -0,0 +1,68 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * Copyright (C) 2025 monkuous
@@ -2180,12 +2332,11 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/asm-offsets.c linux-w
 +	OFFSET(TASK_THREAD_S17, task_struct, thread.s[17]);
 +	OFFSET(TASK_THREAD_SP, task_struct, thread.sp);
 +	OFFSET(TASK_THREAD_LR, task_struct, thread.lr);
-+	OFFSET(TASK_TI_KERNEL_SP, task_struct, thread_info.kernel_sp);
 +}
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/asm-stubs.S linux-workdir/arch/xr17032/kernel/asm-stubs.S
 --- linux-clean/arch/xr17032/kernel/asm-stubs.S	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/asm-stubs.S
-@@ -0,0 +1,16 @@
+@@ -0,0 +1,12 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -2194,10 +2345,6 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/asm-stubs.S linux-wor
 +#include <linux/linkage.h>
 +
 +.text
-+
-+SYM_FUNC_START(__asm_copy_from_user)
-+	brk
-+SYM_FUNC_END(__asm_copy_from_user)
 +
 +SYM_FUNC_START(__clear_user)
 +	brk
@@ -2254,7 +2401,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/context.c linux-workd
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/entry.c linux-workdir/arch/xr17032/kernel/entry.c
 --- linux-clean/arch/xr17032/kernel/entry.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/entry.c
-@@ -0,0 +1,134 @@
+@@ -0,0 +1,176 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -2263,6 +2410,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/entry.c linux-workdir
 +#include <asm/bug.h>
 +#include <asm/irq_regs.h>
 +#include <asm/ptrace.h>
++#include <asm/syscall.h>
 +#include <linux/entry-common.h>
 +#include <linux/hardirq.h>
 +#include <linux/irq.h>
@@ -2270,6 +2418,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/entry.c linux-workdir
 +#include <linux/linkage.h>
 +#include <linux/mm.h>
 +#include <linux/panic.h>
++#include <linux/randomize_kstack.h>
 +#include <linux/sched/debug.h>
 +#include <linux/sched/signal.h>
 +#include <linux/signal.h>
@@ -2365,6 +2514,18 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/entry.c linux-workdir
 +	force_sig_fault(signo, code, (void __user *)addr);
 +}
 +
++
++static void do_trap_error(struct pt_regs *regs, int signo, int code,
++			  unsigned long addr, const char *str)
++{
++	if (user_mode(regs)) {
++		do_trap(regs, signo, code, addr);
++	} else {
++		if (!fixup_exception(regs))
++			die(regs, str);
++	}
++}
++
 +#define TRAP_FUNC_PROTO(name) asmlinkage void name(struct pt_regs *regs)
 +#define TRAP_FUNC(name) TRAP_FUNC_PROTO(name); TRAP_FUNC_PROTO(name)
 +
@@ -2389,10 +2550,38 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/entry.c linux-workdir
 +
 +	irqentry_exit(regs, state);
 +}
++
++TRAP_FUNC(xr17032_handle_syscall)
++{
++	if (!user_mode(regs)) {
++		irqentry_state_t state = irqentry_nmi_enter(regs);
++
++		do_trap_error(regs, SIGILL, ILL_ILLTRP, regs->pc,
++			      "Oops - syscall from kernel mode");
++
++		irqentry_nmi_exit(regs, state);
++	}
++
++	long syscall = regs->a0;
++
++	regs->orig_a3 = regs->a3;
++	regs->a3 = -ENOSYS;
++
++	syscall = syscall_enter_from_user_mode(regs, syscall);
++
++	add_random_kstack_offset();
++
++	if (syscall >= 0 && syscall < NR_syscalls)
++		syscall_handler(regs, syscall);
++
++	choose_random_kstack_offset(get_random_u16());
++
++	syscall_exit_to_user_mode(regs);
++}
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/arch/xr17032/kernel/head.S
 --- linux-clean/arch/xr17032/kernel/head.S	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/head.S
-@@ -0,0 +1,454 @@
+@@ -0,0 +1,453 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -2573,8 +2762,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/
 +
 +.org 0x200
 +SYM_CODE_START_LOCAL(syscall_entry)
-+1:	hlt
-+	beq zero, 1b
++	trap_entry xr17032_handle_syscall
 +SYM_CODE_END(syscall_entry)
 +
 +.org 0x300
@@ -2777,7 +2965,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/
 +	# set up scratch1 if going to user mode
 +	andi t0, t0, RS_OLD_U
 +	beq t0, 1f
-+	mov t0, long [tp + TASK_TI_KERNEL_SP]
++	addi t0, sp, PT_SIZE_ON_STACK
 +	mtcr scratch1, t0
 +1:	# finish register restoration
 +	mov tp, long [sp + PT_TP]
@@ -3117,6 +3305,76 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/setup.c linux-workdir
 +
 +	init_resources();
 +}
+diff -urN --no-dereference linux-clean/arch/xr17032/kernel/signal.c linux-workdir/arch/xr17032/kernel/signal.c
+--- linux-clean/arch/xr17032/kernel/signal.c	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/kernel/signal.c
+@@ -0,0 +1,66 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2025 monkuous
++ */
++
++#include <asm/ucontext.h>
++#include <linux/signal.h>
++#include <linux/syscalls.h>
++
++struct rt_sigframe {
++	struct siginfo info;
++	struct ucontext uc;
++	u32 sigreturn_code[2];
++};
++
++static long restore_sigcontext(struct pt_regs *regs,
++	struct sigcontext __user *sc)
++{
++	/* sc_regs is structured the same as the start of pt_regs */
++	long err = __copy_from_user(regs, &sc->sc_regs, sizeof(sc->sc_regs));
++	if (unlikely(err))
++		return err;
++
++	return 0;
++}
++
++SYSCALL_DEFINE0(rt_sigreturn)
++{
++	struct pt_regs *regs = current_pt_regs();
++	struct rt_sigframe __user *frame;
++	struct task_struct *task;
++	sigset_t set;
++	size_t frame_size = sizeof(*frame);
++
++	/* Always make any pending restarted system calls return -EINTR */
++	current->restart_block.fn = do_no_restart_syscall;
++
++	frame = (struct rt_sigframe __user *)regs->sp;
++
++	if (!access_ok(frame, frame_size))
++		goto badframe;
++
++	if (__copy_from_user(&set, &frame->uc.uc_sigmask, sizeof(set)))
++		goto badframe;
++
++	set_current_blocked(&set);
++
++	if (restore_sigcontext(regs, &frame->uc.uc_mcontext))
++		goto badframe;
++
++	if (restore_altstack(&frame->uc.uc_stack))
++		goto badframe;
++
++	return regs->a3;
++
++badframe:
++	task = current;
++	if (show_unhandled_signals) {
++		pr_info_ratelimited(
++			"%s[%d]: bad frame in %s: frame=%p pc=%p sp=%p\n",
++			task->comm, task_pid_nr(task), __func__,
++			frame, (void *)regs->pc, (void *)regs->sp);
++	}
++	force_sig(SIGSEGV);
++	return 0;
++}
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/stubs.c linux-workdir/arch/xr17032/kernel/stubs.c
 --- linux-clean/arch/xr17032/kernel/stubs.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/stubs.c
@@ -3194,6 +3452,71 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/stubs.c linux-workdir
 +{
 +	pr_cont("TODO show_stack\n");
 +}
+diff -urN --no-dereference linux-clean/arch/xr17032/kernel/sys_xr17032.c linux-workdir/arch/xr17032/kernel/sys_xr17032.c
+--- linux-clean/arch/xr17032/kernel/sys_xr17032.c	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/kernel/sys_xr17032.c
+@@ -0,0 +1,34 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2025 monkuous
++ */
++
++#include <linux/syscalls.h>
++
++static long xr17032_sys_mmap(unsigned long addr, unsigned long len,
++			     unsigned long prot, unsigned long flags,
++			     unsigned long fd, off_t offset,
++			     unsigned long page_shift_offset)
++{
++	if (unlikely(offset & (~PAGE_MASK >> page_shift_offset)))
++		return -EINVAL;
++
++	return ksys_mmap_pgoff(addr, len, prot, flags, fd,
++			       offset >> (PAGE_SHIFT - page_shift_offset));
++}
++
++SYSCALL_DEFINE6(mmap2, unsigned long, addr, unsigned long, len,
++		unsigned long, prot, unsigned long, flags,
++		unsigned long, fd, unsigned long, offset)
++{
++	/*
++	 * Note that the shift for mmap2 is constant (12),
++	 * regardless of PAGE_SIZE
++	 */
++	return xr17032_sys_mmap(addr, len, prot, flags, fd, offset, 12);
++}
++
++asmlinkage long __xr17032_sys_ni_syscall(const struct pt_regs *__unused)
++{
++	return -ENOSYS;
++}
+diff -urN --no-dereference linux-clean/arch/xr17032/kernel/syscall_table.c linux-workdir/arch/xr17032/kernel/syscall_table.c
+--- linux-clean/arch/xr17032/kernel/syscall_table.c	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/kernel/syscall_table.c
+@@ -0,0 +1,23 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2025 monkuous
++ */
++
++#include <asm/syscall.h>
++#include <asm-generic/syscalls.h>
++#include <linux/linkage.h>
++#include <linux/syscalls.h>
++
++#define __SYSCALL_WITH_COMPAT(nr, native, compat) __SYSCALL(nr, native)
++
++#undef __SYSCALL
++#define __SYSCALL(nr, call)	asmlinkage long __xr17032_##call(const struct pt_regs *);
++#include <asm/syscall_table_32.h>
++
++#undef __SYSCALL
++#define __SYSCALL(nr, call)	[nr] = __xr17032_##call,
++
++void * const sys_call_table[__NR_syscalls] = {
++	[0 ... __NR_syscalls - 1] = __xr17032_sys_ni_syscall,
++#include <asm/syscall_table_32.h>
++};
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/time.c linux-workdir/arch/xr17032/kernel/time.c
 --- linux-clean/arch/xr17032/kernel/time.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/time.c
@@ -3394,7 +3717,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/lib/delay.c linux-workdir/ar
 diff -urN --no-dereference linux-clean/arch/xr17032/lib/uaccess.S linux-workdir/arch/xr17032/lib/uaccess.S
 --- linux-clean/arch/xr17032/lib/uaccess.S	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/lib/uaccess.S
-@@ -0,0 +1,32 @@
+@@ -0,0 +1,33 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -3427,6 +3750,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/lib/uaccess.S linux-workdir/
 +	sub	a3, t5, a0
 +	jalr	zero, lr, 0
 +SYM_FUNC_END(__asm_copy_to_user)
++SYM_FUNC_ALIAS(__asm_copy_from_user, __asm_copy_to_user)
 diff -urN --no-dereference linux-clean/arch/xr17032/mm/Makefile linux-workdir/arch/xr17032/mm/Makefile
 --- linux-clean/arch/xr17032/mm/Makefile	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/mm/Makefile
@@ -3457,7 +3781,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/mm/extable.c linux-workdir/a
 +static inline unsigned long
 +get_ex_fixup(const struct exception_table_entry *ex)
 +{
-+	return ((unsigned long)&ex->fixup + ex->fixup);
++	return ex->fixup;
 +}
 +
 +static bool ex_handler_fixup(const struct exception_table_entry *ex,
@@ -5259,7 +5583,7 @@ diff -urN --no-dereference linux-clean/drivers/tty/serial/Makefile linux-workdir
 diff -urN --no-dereference linux-clean/drivers/tty/serial/xrarch_uart.c linux-workdir/drivers/tty/serial/xrarch_uart.c
 --- linux-clean/drivers/tty/serial/xrarch_uart.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/drivers/tty/serial/xrarch_uart.c
-@@ -0,0 +1,435 @@
+@@ -0,0 +1,436 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * XR/arch UART driver
@@ -5387,6 +5711,7 @@ diff -urN --no-dereference linux-clean/drivers/tty/serial/xrarch_uart.c linux-wo
 +
 +static void xrarch_serial_start_tx(struct uart_port *port)
 +{
++	xrarch_serial_do_tx(port);
 +}
 +
 +static void xrarch_serial_stop_rx(struct uart_port *port)

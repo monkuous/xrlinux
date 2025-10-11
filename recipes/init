@@ -8,8 +8,19 @@ hostdeps="binutils gcc-bootstrap"
 imagedeps="build-essential"
 
 build() {
-    "${TRIPLE}-gcc" -ffreestanding -fno-pic -static -nostdlib -o init -x c - << EOF
+    "${TRIPLE}-gcc" -ffreestanding -fno-pic -static -nostdlib -o init -x c -O3 - << EOF
+#include <stddef.h>
+
 void _start(void) {
+    static const char message[] = "Hello from userspace!\n";
+
+    register unsigned long sys_nr asm("a0") = 64; /* __NR_write */
+    register unsigned long ret asm("a3");
+    register int fd asm("t0") = 1;
+    register const void *buf asm("t1") = message;
+    register size_t count asm("t2") = sizeof(message) - 1;
+    asm volatile("sys" : "=r" (ret) : "r" (sys_nr), "r" (fd), "r" (buf), "r" (count) : "memory");
+
     asm volatile("1: beq zero, 1b");
 }
 EOF
