@@ -3417,7 +3417,7 @@ diff -urN --no-dereference linux-clean/drivers/block/Makefile linux-workdir/driv
 diff -urN --no-dereference linux-clean/drivers/block/xrarch.c linux-workdir/drivers/block/xrarch.c
 --- linux-clean/drivers/block/xrarch.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/drivers/block/xrarch.c
-@@ -0,0 +1,382 @@
+@@ -0,0 +1,401 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -3426,6 +3426,7 @@ diff -urN --no-dereference linux-clean/drivers/block/xrarch.c linux-workdir/driv
 +#define pr_fmt(fmt) "xrarch-disk: " fmt
 +#include <linux/blkdev.h>
 +#include <linux/blk-mq.h>
++#include <linux/dma-mapping.h>
 +#include <linux/idr.h>
 +#include <linux/interrupt.h>
 +#include <linux/module.h>
@@ -3471,6 +3472,9 @@ diff -urN --no-dereference linux-clean/drivers/block/xrarch.c linux-workdir/driv
 +	struct gendisk *disk;
 +	struct blk_mq_tag_set tag_set;
 +	struct request *req;
++	dma_addr_t dma_addr;
++	size_t dma_length;
++	enum dma_data_direction dma_direction;
 +};
 +
 +static DEFINE_IDA(xrarch_disk_id_ida);
@@ -3505,6 +3509,8 @@ diff -urN --no-dereference linux-clean/drivers/block/xrarch.c linux-workdir/driv
 +
 +		BUG_ON(!req);
 +
++		dma_unmap_page(ctrl->dev, xdisk->dma_addr, xdisk->dma_length,
++			       xdisk->dma_direction);
 +		blk_mq_complete_request(req);
 +	}
 +
@@ -3522,13 +3528,16 @@ diff -urN --no-dereference linux-clean/drivers/block/xrarch.c linux-workdir/driv
 +	BUG_ON(blk_rq_nr_phys_segments(req) != 1);
 +
 +	u32 submit_cmd;
++	enum dma_data_direction dma_direction;
 +
 +	switch (req_op(req)) {
 +	case REQ_OP_READ:
 +		submit_cmd = XRDISK_READ;
++		dma_direction = DMA_FROM_DEVICE;
 +		break;
 +	case REQ_OP_WRITE:
 +		submit_cmd = XRDISK_WRITE;
++		dma_direction = DMA_TO_DEVICE;
 +		break;
 +	default:
 +		WARN_ON_ONCE(1);
@@ -3543,11 +3552,17 @@ diff -urN --no-dereference linux-clean/drivers/block/xrarch.c linux-workdir/driv
 +	bio_for_each_segment(bvec, req->bio, iter)
 +		break;
 +
-+	u32 addr = page_to_phys(bvec.bv_page) + bvec.bv_offset;
 +	u32 size = bvec.bv_len;
 +
-+	BUG_ON((addr | size) & ((1U << XRDISK_SECT_SHIFT) - 1));
++	BUG_ON(size & ((1U << XRDISK_SECT_SHIFT) - 1));
 +	BUG_ON(size > (8U << XRDISK_SECT_SHIFT));
++
++	dma_addr_t dma_addr = dma_map_bvec(xdisk->ctrl->dev, &bvec,
++					   dma_direction, 0);
++	if (dma_mapping_error(xdisk->ctrl->dev, dma_addr))
++		return BLK_STS_IOERR;
++
++	BUG_ON(dma_addr & ((1U << XRDISK_SECT_SHIFT) - 1));
 +
 +	blk_mq_start_request(req);
 +
@@ -3555,11 +3570,15 @@ diff -urN --no-dereference linux-clean/drivers/block/xrarch.c linux-workdir/driv
 +	spin_lock_irqsave(&xdisk->ctrl->lock, flags);
 +
 +	BUG_ON(xdisk->req);
++
 +	xdisk->req = req;
++	xdisk->dma_addr = dma_addr;
++	xdisk->dma_length = size;
++	xdisk->dma_direction = dma_direction;
 +
 +	xrarch_disk_write(xdisk->ctrl, XRDISK_DATA0, xdisk->index);
 +	xrarch_disk_write(xdisk->ctrl, XRDISK_CMD, XRDISK_SELECT);
-+	xrarch_disk_write(xdisk->ctrl, XRDISK_DATA0, addr);
++	xrarch_disk_write(xdisk->ctrl, XRDISK_DATA0, dma_addr);
 +	xrarch_disk_write(xdisk->ctrl, XRDISK_CMD, XRDISK_DEST);
 +	xrarch_disk_write(xdisk->ctrl, XRDISK_DATA0, size >> XRDISK_SECT_SHIFT);
 +	xrarch_disk_write(xdisk->ctrl, XRDISK_CMD, XRDISK_COUNT);
