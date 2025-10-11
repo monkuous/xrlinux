@@ -637,7 +637,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/elf.h linux-work
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/entry-common.h linux-workdir/arch/xr17032/include/asm/entry-common.h
 --- linux-clean/arch/xr17032/include/asm/entry-common.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/entry-common.h
-@@ -0,0 +1,15 @@
+@@ -0,0 +1,16 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -651,6 +651,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/entry-common.h l
 +void do_trap(struct pt_regs *regs, int signo, int code, unsigned long addr);
 +
 +void handle_page_fault(struct pt_regs *regs);
++void handle_break(struct pt_regs *regs);
 +
 +#endif /* _ASM_XR17032_ENTRY_COMMON_H */
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/extable.h linux-workdir/arch/xr17032/include/asm/extable.h
@@ -2401,7 +2402,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/context.c linux-workd
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/entry.c linux-workdir/arch/xr17032/kernel/entry.c
 --- linux-clean/arch/xr17032/kernel/entry.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/entry.c
-@@ -0,0 +1,176 @@
+@@ -0,0 +1,269 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -2526,6 +2527,21 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/entry.c linux-workdir
 +	}
 +}
 +
++void handle_break(struct pt_regs *regs)
++{
++	if (user_mode(regs))
++		force_sig_fault(SIGTRAP, TRAP_BRKPT, (void __user *)regs->pc);
++#ifdef CONFIG_KGDB
++	else if (notify_die(DIE_TRAP, "BRK", regs, 0, regs->rs >> 28, SIGTRAP)
++		 == NOTIFY_STOP)
++		return;
++#endif
++	else if (report_bug(regs->pc, regs) == BUG_TRAP_TYPE_WARN)
++		return;
++	else
++		die(regs, "Kernel BUG");
++}
++
 +#define TRAP_FUNC_PROTO(name) asmlinkage void name(struct pt_regs *regs)
 +#define TRAP_FUNC(name) TRAP_FUNC_PROTO(name); TRAP_FUNC_PROTO(name)
 +
@@ -2578,10 +2594,88 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/entry.c linux-workdir
 +
 +	syscall_exit_to_user_mode(regs);
 +}
++
++TRAP_FUNC(xr17032_handle_breakpoint)
++{
++	if (user_mode(regs)) {
++		irqentry_enter_from_user_mode(regs);
++		local_irq_enable();
++
++		handle_break(regs);
++
++		local_irq_disable();
++		irqentry_exit_to_user_mode(regs);
++	} else {
++		irqentry_state_t state = irqentry_nmi_enter(regs);
++
++		handle_break(regs);
++
++		irqentry_nmi_exit(regs, state);
++	}
++}
++
++TRAP_FUNC(xr17032_handle_bus_error)
++{
++	if (user_mode(regs)) {
++		irqentry_enter_from_user_mode(regs);
++		local_irq_enable();
++
++		die(regs, "Oops - bus error");
++
++		local_irq_disable();
++		irqentry_exit_to_user_mode(regs);
++	} else {
++		irqentry_state_t state = irqentry_nmi_enter(regs);
++
++		die(regs, "Oops - bus error");
++
++		irqentry_nmi_exit(regs, state);
++	}
++}
++
++TRAP_FUNC(xr17032_handle_nmi)
++{
++	if (user_mode(regs)) {
++		irqentry_enter_from_user_mode(regs);
++		local_irq_enable();
++
++		die(regs, "Oops - non-maskable interrupt");
++
++		local_irq_disable();
++		irqentry_exit_to_user_mode(regs);
++	} else {
++		irqentry_state_t state = irqentry_nmi_enter(regs);
++
++		die(regs, "Oops - non-maskable interrupt");
++
++		irqentry_nmi_exit(regs, state);
++	}
++}
++
++#define DO_ERROR_INFO(name, signo, code, str)					\
++TRAP_FUNC(name)									\
++{										\
++	if (user_mode(regs)) {							\
++		irqentry_enter_from_user_mode(regs);				\
++		local_irq_enable();						\
++		do_trap_error(regs, signo, code, regs->pc, "Oops - " str);	\
++		local_irq_disable();						\
++		irqentry_exit_to_user_mode(regs);				\
++	} else {								\
++		irqentry_state_t state = irqentry_nmi_enter(regs);		\
++		do_trap_error(regs, signo, code, regs->pc, "Oops - " str);	\
++		irqentry_nmi_exit(regs, state);					\
++	}									\
++}
++
++DO_ERROR_INFO(xr17032_handle_invalid_instruction, SIGILL, ILL_ILLOPC,
++	      "illegal instruction")
++DO_ERROR_INFO(xr17032_handle_unaligned_access, SIGBUS, BUS_ADRALN,
++	      "unaligned access")
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/arch/xr17032/kernel/head.S
 --- linux-clean/arch/xr17032/kernel/head.S	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/head.S
-@@ -0,0 +1,453 @@
+@@ -0,0 +1,447 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -2794,38 +2888,32 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/
 +
 +.org 0x400
 +SYM_CODE_START_LOCAL(bus_error_entry)
-+1:	hlt
-+	beq zero, 1b
++	trap_entry xr17032_handle_bus_error
 +SYM_CODE_END(bus_error_entry)
 +
 +.org 0x500
 +SYM_CODE_START_LOCAL(nmi_entry)
-+1:	hlt
-+	beq zero, 1b
++	trap_entry xr17032_handle_nmi
 +SYM_CODE_END(nmi_entry)
 +
 +.org 0x600
 +SYM_CODE_START_LOCAL(breakpoint_entry)
-+1:	hlt
-+	beq zero, 1b
++	trap_entry xr17032_handle_breakpoint
 +SYM_CODE_END(breakpoint_entry)
 +
 +.org 0x700
 +SYM_CODE_START_LOCAL(invalid_instruction_entry)
-+1:	hlt
-+	beq zero, 1b
++	trap_entry xr17032_handle_invalid_instruction
 +SYM_CODE_END(invalid_instruction_entry)
 +
 +.org 0x800
 +SYM_CODE_START_LOCAL(privileged_instruction_entry)
-+1:	hlt
-+	beq zero, 1b
++	trap_entry xr17032_handle_invalid_instruction
 +SYM_CODE_END(privileged_instruction_entry)
 +
 +.org 0x900
 +SYM_CODE_START_LOCAL(unaligned_access_entry)
-+1:	hlt
-+	beq zero, 1b
++	trap_entry xr17032_handle_unaligned_access
 +SYM_CODE_END(unaligned_access_entry)
 +
 +.org 0xc00
