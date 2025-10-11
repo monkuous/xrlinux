@@ -4009,7 +4009,7 @@ diff -urN --no-dereference linux-clean/drivers/tty/serial/Makefile linux-workdir
 diff -urN --no-dereference linux-clean/drivers/tty/serial/xrarch_uart.c linux-workdir/drivers/tty/serial/xrarch_uart.c
 --- linux-clean/drivers/tty/serial/xrarch_uart.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/drivers/tty/serial/xrarch_uart.c
-@@ -0,0 +1,420 @@
+@@ -0,0 +1,435 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * XR/arch UART driver
@@ -4131,6 +4131,18 @@ diff -urN --no-dereference linux-clean/drivers/tty/serial/xrarch_uart.c linux-wo
 +	return TIOCM_CAR | TIOCM_DSR | TIOCM_CTS;
 +}
 +
++static void xrarch_serial_stop_tx(struct uart_port *port)
++{
++}
++
++static void xrarch_serial_start_tx(struct uart_port *port)
++{
++}
++
++static void xrarch_serial_stop_rx(struct uart_port *port)
++{
++}
++
 +static int xrarch_serial_startup(struct uart_port *port)
 +{
 +	int ret = request_irq(port->irq, xrarch_serial_int, 0, DRIVER_NAME,
@@ -4187,6 +4199,9 @@ diff -urN --no-dereference linux-clean/drivers/tty/serial/xrarch_uart.c linux-wo
 +static const struct uart_ops xrarch_serial_pops = {
 +	.set_mctrl	= xrarch_serial_set_mctrl,
 +	.get_mctrl	= xrarch_serial_get_mctrl,
++	.stop_tx	= xrarch_serial_stop_tx,
++	.start_tx	= xrarch_serial_start_tx,
++	.stop_rx	= xrarch_serial_stop_rx,
 +	.startup	= xrarch_serial_startup,
 +	.shutdown	= xrarch_serial_shutdown,
 +	.set_termios	= xrarch_serial_set_termios,
