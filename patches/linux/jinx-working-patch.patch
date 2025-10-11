@@ -10,7 +10,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/Kbuild linux-workdir/arch/xr
 diff -urN --no-dereference linux-clean/arch/xr17032/Kconfig linux-workdir/arch/xr17032/Kconfig
 --- linux-clean/arch/xr17032/Kconfig	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/Kconfig
-@@ -0,0 +1,45 @@
+@@ -0,0 +1,47 @@
 +# SPDX-License-Identifier: GPL-2.0-only
 +
 +config XR17032
@@ -38,6 +38,8 @@ diff -urN --no-dereference linux-clean/arch/xr17032/Kconfig linux-workdir/arch/x
 +	select GENERIC_LIB_ASHRDI3
 +	select LOCK_MM_AND_FIND_VMA
 +	select ARCH_HAS_SYSCALL_WRAPPER
++	select ARCH_HAS_SETUP_DMA_OPS
++	select ARCH_HAS_SYNC_DMA_FOR_CPU
 +
 +config MMU
 +	def_bool y
@@ -396,6 +398,73 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/cache.h linux-wo
 +#define L1_CACHE_BYTES (1 << L1_CACHE_SHIFT)
 +
 +#endif /* _ASM_XR17032_CACHE_H */
+diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/cacheflush.h linux-workdir/arch/xr17032/include/asm/cacheflush.h
+--- linux-clean/arch/xr17032/include/asm/cacheflush.h	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/include/asm/cacheflush.h
+@@ -0,0 +1,63 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2025 monkuous
++ */
++
++#ifndef _ASM_XR17032_CACHEFLUSH_H
++#define _ASM_XR17032_CACHEFLUSH_H
++
++#include <asm/cr.h>
++#include <linux/mm.h>
++
++static inline void local_flush_icache_all(void)
++{
++	cr_write(icachectrl, 3);
++}
++
++static inline void local_flush_icache_page(unsigned long page)
++{
++	page &= PAGE_MASK;
++	cr_write(icachectrl, page | 2);
++}
++
++void local_flush_icache_range(unsigned long start, unsigned long end);
++
++#define PG_dcache_clean PG_arch_1
++
++static inline void flush_dcache_folio(struct folio *folio)
++{
++	if (test_bit(PG_dcache_clean, &folio->flags))
++		clear_bit(PG_dcache_clean, &folio->flags);
++}
++#define flush_dcache_folio flush_dcache_folio
++#define ARCH_IMPLEMENTS_FLUSH_DCACHE_PAGE 1
++
++static inline void flush_dcache_page(struct page *page)
++{
++	flush_dcache_folio(page_folio(page));
++}
++
++#define flush_icache_user_page(vma, pg, addr, len)	\
++do {							\
++	if (vma->vm_flags & VM_EXEC)			\
++		flush_icache_mm(vma->vm_mm, 0);		\
++} while (0)
++
++#ifndef CONFIG_SMP
++
++#define flush_icache_all		local_flush_icache_all
++#define flush_icache_mm(mm, local)	flush_icache_all()
++#define flush_icache_range		local_flush_icache_range
++
++#else /* CONFIG_SMP */
++
++void flush_icache_all(void);
++void flush_icache_mm(struct mm_struct *mm, bool local);
++void flush_icache_range(unsigned long start, unsigned long end);
++#define flush_icache_range flush_icache_range
++
++#endif /* CONFIG_SMP */
++
++#include <asm-generic/cacheflush.h>
++
++#endif /* _ASM_XR17032_CACHEFLUSH_H */
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/cmpxchg.h linux-workdir/arch/xr17032/include/asm/cmpxchg.h
 --- linux-clean/arch/xr17032/include/asm/cmpxchg.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/cmpxchg.h
@@ -1771,7 +1840,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/tlbflush.h linux
 +
 +static inline void local_flush_tlb_page(unsigned long addr)
 +{
-+	addr &= ~0xfffUL;
++	addr &= PAGE_MASK;
 +	asm volatile("mtcr itbctrl, %0" :: "r" (addr) : "memory");
 +	asm volatile("mtcr dtbctrl, %0" :: "r" (addr) : "memory");
 +	asm volatile(
@@ -3842,13 +3911,86 @@ diff -urN --no-dereference linux-clean/arch/xr17032/lib/uaccess.S linux-workdir/
 diff -urN --no-dereference linux-clean/arch/xr17032/mm/Makefile linux-workdir/arch/xr17032/mm/Makefile
 --- linux-clean/arch/xr17032/mm/Makefile	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/mm/Makefile
-@@ -0,0 +1,6 @@
+@@ -0,0 +1,8 @@
 +# SPDX-License-Identifier: GPL-2.0-only
 +
-+obj-y += extable.o
-+obj-y += fault.o
-+obj-y += init.o
-+obj-y += tlbflush.o
++obj-y	+= cacheflush.o
++obj-y	+= dma.o
++obj-y	+= extable.o
++obj-y	+= fault.o
++obj-y	+= init.o
++obj-y	+= tlbflush.o
+diff -urN --no-dereference linux-clean/arch/xr17032/mm/cacheflush.c linux-workdir/arch/xr17032/mm/cacheflush.c
+--- linux-clean/arch/xr17032/mm/cacheflush.c	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/mm/cacheflush.c
+@@ -0,0 +1,24 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2025 monkuous
++ */
++
++#include <asm/cacheflush.h>
++#include <asm/page.h>
++
++#define ICACHE_FLUSH_ALL_THRESHOLD 64
++
++void local_flush_icache_range(unsigned long start, unsigned long end)
++{
++	unsigned long nr_ptes_in_range = DIV_ROUND_UP(end - start, PAGE_SIZE);
++
++	if (nr_ptes_in_range > ICACHE_FLUSH_ALL_THRESHOLD) {
++		local_flush_icache_all();
++		return;
++	}
++
++	for (unsigned long i = 0; i < nr_ptes_in_range; i++) {
++		local_flush_icache_page(start);
++		start += PAGE_SIZE;
++	}
++}
+diff -urN --no-dereference linux-clean/arch/xr17032/mm/dma.c linux-workdir/arch/xr17032/mm/dma.c
+--- linux-clean/arch/xr17032/mm/dma.c	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/mm/dma.c
+@@ -0,0 +1,39 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2025 monkuous
++ */
++
++#include <asm/cr.h>
++#include <asm/page.h>
++#include <linux/dma-map-ops.h>
++
++static inline void arch_dma_cache_inv(phys_addr_t paddr, size_t size)
++{
++	paddr &= PAGE_MASK;
++	size_t nr_ptes_in_range = DIV_ROUND_UP(size, PAGE_SIZE);
++
++	for (size_t i = 0; i < nr_ptes_in_range; i++) {
++		cr_write(dcachectrl, paddr | 2);
++		paddr += PAGE_SIZE;
++	}
++}
++
++void arch_setup_dma_ops(struct device *dev, bool coherent)
++{
++	dev->dma_coherent = coherent;
++}
++
++void arch_sync_dma_for_cpu(phys_addr_t paddr, size_t size,
++			   enum dma_data_direction dir)
++{
++	switch (dir) {
++	case DMA_TO_DEVICE:
++		break;
++	case DMA_FROM_DEVICE:
++	case DMA_BIDIRECTIONAL:
++		arch_dma_cache_inv(paddr, size);
++		break;
++	default:
++		break;
++	}
++}
 diff -urN --no-dereference linux-clean/arch/xr17032/mm/extable.c linux-workdir/arch/xr17032/mm/extable.c
 --- linux-clean/arch/xr17032/mm/extable.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/mm/extable.c
