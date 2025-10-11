@@ -14,6 +14,8 @@ void BxPrintCharacter(unsigned char c) {
 }
 
 bool BxReadFromDisk(void *buffer, uint64_t sector, size_t count) {
+    if ((uintptr_t)buffer & 511) BlCrash("BxReadFromDisk: unaligned buffer");
+
     uint64_t end = sector + count;
     if (end < sector) return false;
     if (end > BxBootDisk->SectorCount) end = BxBootDisk->SectorCount;

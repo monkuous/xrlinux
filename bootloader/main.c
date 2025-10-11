@@ -26,7 +26,7 @@ static void BiLoadKernel(void) {
     struct BlFsFile *file = BlFsFind(BlKernelPath);
     if (!file) BlCrash("failed to open kernel file");
 
-    BlFsFileRead(file, &BlKernelHeader, sizeof(BlKernelHeader), 0);
+    BlFsFileRead(file, &BlKernelHeader, sizeof(BlKernelHeader), 0, false);
     if (BL_LE32(BlKernelHeader.Magic) != BI_PROTOCOL_MAGIC) BlCrash("invalid magic number");
 
     BlKernelHeader.MinorVersion = BL_LE16(BlKernelHeader.MinorVersion);
@@ -78,7 +78,7 @@ static void BiLoadKernel(void) {
         size_t readCount = BL_MIN(tailCount, fileSize);
 
         BlFillMemory(buffer, 0, headCount);
-        BlFsFileRead(file, buffer + headCount, readCount, 0);
+        BlFsFileRead(file, buffer + headCount, readCount, 0, false);
 
         if (readCount != tailCount) {
             BlFillMemory(buffer + headCount + readCount, 0, tailCount - readCount);
@@ -90,7 +90,7 @@ static void BiLoadKernel(void) {
 
     while (current < alignedFileEnd) {
         void *buffer = BlAllocateHeap(BL_PAGE_SIZE, BL_PAGE_SIZE, true);
-        BlFsFileRead(file, buffer, BL_PAGE_SIZE, current - BlKernelHeader.VirtualAddr);
+        BlFsFileRead(file, buffer, BL_PAGE_SIZE, current - BlKernelHeader.VirtualAddr, true);
         BlMapPage(current, (uintptr_t)buffer);
         current += BL_PAGE_SIZE;
     }
@@ -100,7 +100,7 @@ static void BiLoadKernel(void) {
         size_t headCount = fileEnd - current;
         size_t tailCount = BL_PAGE_SIZE - headCount;
 
-        BlFsFileRead(file, buffer, headCount, current - BlKernelHeader.VirtualAddr);
+        BlFsFileRead(file, buffer, headCount, current - BlKernelHeader.VirtualAddr, false);
         BlFillMemory(buffer + headCount, 0, tailCount);
 
         BlMapPage(current, (uintptr_t)buffer);

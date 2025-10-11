@@ -77,7 +77,7 @@ void BlLoadConfigurationFromFile(struct BlFsFile *file) {
 
     uint64_t size = BlFsFileSize(file);
     auto buffer = BL_ALLOCATE(char, size);
-    BlFsFileRead(file, buffer, size, 0);
+    BlFsFileRead(file, buffer, size, 0, false);
 
     char *start = buffer;
     size_t line = 1;

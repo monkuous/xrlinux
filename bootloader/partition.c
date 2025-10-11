@@ -43,17 +43,26 @@ static void *BiGetBcacheEntry(uint64_t block) {
     return BiBufferCache[line][set];
 }
 
-static void BiReadFromDisk(void *buffer, uint64_t position, size_t count) {
-    while (count != 0) {
-        uint64_t block = position >> BI_BCACHE_SHIFT;
-        size_t offset = position & BI_BCACHE_MASK;
-        size_t current = BL_MIN(BI_BCACHE_SIZE - offset, count);
+static void BiReadFromDisk(void *buffer, uint64_t position, size_t count, bool bypassCache) {
+    if (bypassCache) {
+        size_t mask = (1U << BL_SECTOR_SHIFT) - 1;
 
-        BlCopyMemory(buffer, BiGetBcacheEntry(block) + offset, current);
+        if (position & mask) BlCrash("BiReadFromDisk: unaligned position");
+        if (count & mask) BlCrash("BiReadFromDisk: unaligned size");
 
-        buffer += current;
-        position += current;
-        count -= current;
+        BxReadFromDisk(buffer, position >> BL_SECTOR_SHIFT, count >> BL_SECTOR_SHIFT);
+    } else {
+        while (count != 0) {
+            uint64_t block = position >> BI_BCACHE_SHIFT;
+            size_t offset = position & BI_BCACHE_MASK;
+            size_t current = BL_MIN(BI_BCACHE_SIZE - offset, count);
+
+            BlCopyMemory(buffer, BiGetBcacheEntry(block) + offset, current);
+
+            buffer += current;
+            position += current;
+            count -= current;
+        }
     }
 }
 
@@ -87,7 +96,7 @@ void BlFindRootPartition(void) {
     BlPrint("Searching for root partition\n");
 
     struct Mbr mbr;
-    BiReadFromDisk(&mbr, BI_MBR_OFFSET, sizeof(mbr));
+    BiReadFromDisk(&mbr, BI_MBR_OFFSET, sizeof(mbr), false);
 
     if (BL_LE32(mbr.Signature) != BI_MBR_SIGNATURE) BlCrash("invalid mbr");
 
@@ -115,9 +124,9 @@ void BlFindRootPartition(void) {
     BlCrash("failed to find root partition");
 }
 
-void BlReadFromPartition(void *buffer, uint64_t position, size_t count) {
+void BlReadFromPartition(void *buffer, uint64_t position, size_t count, bool bypassCache) {
     uint64_t end = position + count;
     if (end < position || end > BlRootPartition.Size) BlCrash("tried to read beyond partition bounds");
 
-    BiReadFromDisk(buffer, BlRootPartition.Start + position, count);
+    BiReadFromDisk(buffer, BlRootPartition.Start + position, count, bypassCache);
 }

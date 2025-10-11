@@ -124,7 +124,7 @@ static uint32_t BiIndirectionMask;
 static struct BiInode BiRoot;
 
 static void BiReadBlockGroupDescriptor(struct BiBlockGroupDescriptor *out, uint32_t group) {
-    BlReadFromPartition(out, BiBgdtLocation + (uint64_t)group * 32, sizeof(*out));
+    BlReadFromPartition(out, BiBgdtLocation + (uint64_t)group * 32, sizeof(*out), false);
     out->InodeTableBlock = BL_LE32(out->InodeTableBlock);
 }
 
@@ -137,7 +137,7 @@ static void BiReadInode(struct BiInode *out, uint32_t inode) {
     BiReadBlockGroupDescriptor(&groupDescriptor, group);
 
     uint64_t location = ((uint64_t)groupDescriptor.InodeTableBlock << BiSuperblock.BlockSizeShift) + offset;
-    BlReadFromPartition(out, location, sizeof(*out));
+    BlReadFromPartition(out, location, sizeof(*out), false);
 
     for (size_t i = 0; i < BL_ARRAY_SIZE(out->DirectBlocks); i++) {
         out->DirectBlocks[i] = BL_LE32(out->DirectBlocks[i]);
@@ -155,7 +155,7 @@ static void BiReadInode(struct BiInode *out, uint32_t inode) {
 
 static uint32_t BiReadFromPointerBlock(uint32_t block, uint32_t index) {
     uint32_t value;
-    BlReadFromPartition(&value, (block << BiSuperblock.BlockSizeShift) + index * sizeof(value), sizeof(value));
+    BlReadFromPartition(&value, (block << BiSuperblock.BlockSizeShift) + index * sizeof(value), sizeof(value), false);
     return BL_LE32(value);
 }
 
@@ -186,7 +186,7 @@ static uint64_t BiGetInodeBlockBase(struct BiInode *inode, uint64_t block) {
     return volumeBlock;
 }
 
-static void BiReadFromInode(struct BiInode *inode, void *buffer, size_t size, uint64_t position) {
+static void BiReadFromInode(struct BiInode *inode, void *buffer, size_t size, uint64_t position, bool bypassCache) {
     while (size) {
         uint64_t block = position >> BiSuperblock.BlockSizeShift;
         size_t offset = position & (BiBlockSize - 1);
@@ -195,7 +195,7 @@ static void BiReadFromInode(struct BiInode *inode, void *buffer, size_t size, ui
         uint64_t blockBase = BiGetInodeBlockBase(inode, block) << BiSuperblock.BlockSizeShift;
 
         if (blockBase) {
-            BlReadFromPartition(buffer, blockBase + offset, current);
+            BlReadFromPartition(buffer, blockBase + offset, current, bypassCache);
         } else {
             BlFillMemory(buffer, 0, current);
         }
@@ -223,14 +223,14 @@ static bool BiFindEntryInDirectory(struct BiEntry *out, struct BiInode *dir, con
     auto buffer = BL_ALLOCATE(char, nameLength);
 
     while (BiInodeSize(dir) - offset >= sizeof(*out)) {
-        BiReadFromInode(dir, out, sizeof(*out), offset);
+        BiReadFromInode(dir, out, sizeof(*out), offset, false);
 
         out->Inode = BL_LE32(out->Inode);
         out->Size = BL_LE16(out->Size);
 
         if ((BiSuperblock.RequiredFeatures & BI_DIR_TYPES) != 0 || out->Type == 0) {
             if (out->Inode != 0 && out->NameLength == nameLength) {
-                BiReadFromInode(dir, buffer, nameLength, offset + sizeof(*out));
+                BiReadFromInode(dir, buffer, nameLength, offset + sizeof(*out), false);
 
                 if (BlCompareMemory(buffer, name, nameLength) == 0) {
                     BlFreeHeap(buffer);
@@ -247,7 +247,7 @@ static bool BiFindEntryInDirectory(struct BiEntry *out, struct BiInode *dir, con
 }
 
 bool BlFsInitialize(void) {
-    BlReadFromPartition(&BiSuperblock, BI_SUPERBLOCK_OFFSET, sizeof(BiSuperblock));
+    BlReadFromPartition(&BiSuperblock, BI_SUPERBLOCK_OFFSET, sizeof(BiSuperblock), false);
     if (BL_LE16(BiSuperblock.Signature) != BI_SIGNATURE) return false;
 
     BiSuperblock.BlockSizeShift = BL_LE32(BiSuperblock.BlockSizeShift) + 10;
@@ -328,7 +328,7 @@ static struct BiInode *BiFindInode(struct BiInode *inode, const char *path, size
         if (BI_TYPE(newInode->Mode) == BI_TYPE_SYM) {
             auto size = BiInodeSize(newInode);
             auto linkPath = BL_ALLOCATE(char, size);
-            BiReadFromInode(newInode, linkPath, size, 0);
+            BiReadFromInode(newInode, linkPath, size, 0, false);
             BiMaybeFreeInode(newInode);
             newInode = BiFindInode(inode, linkPath, size, symlinks + 1);
             BlFreeHeap(linkPath);
@@ -362,7 +362,7 @@ uint64_t BlFsFileSize(struct BlFsFile *file) {
     return BiInodeSize(&file->Inode);
 }
 
-void BlFsFileRead(struct BlFsFile *file, void *buffer, size_t count, uint64_t position) {
+void BlFsFileRead(struct BlFsFile *file, void *buffer, size_t count, uint64_t position, bool bypassCache) {
     if (!count) return;
 
     uint64_t fileSize = BiInodeSize(&file->Inode);
@@ -371,7 +371,7 @@ void BlFsFileRead(struct BlFsFile *file, void *buffer, size_t count, uint64_t po
     uint64_t avail = position - fileSize;
     if (count > avail) return;
 
-    BiReadFromInode(&file->Inode, buffer, count, position);
+    BiReadFromInode(&file->Inode, buffer, count, position, bypassCache);
 }
 
 void BlFsFree(struct BlFsFile *file) {
