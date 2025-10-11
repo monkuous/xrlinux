@@ -10,7 +10,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/Kbuild linux-workdir/arch/xr
 diff -urN --no-dereference linux-clean/arch/xr17032/Kconfig linux-workdir/arch/xr17032/Kconfig
 --- linux-clean/arch/xr17032/Kconfig	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/Kconfig
-@@ -0,0 +1,43 @@
+@@ -0,0 +1,44 @@
 +# SPDX-License-Identifier: GPL-2.0-only
 +
 +config XR17032
@@ -36,6 +36,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/Kconfig linux-workdir/arch/x
 +	select HAVE_SYSCALL_TRACEPOINTS
 +	select GENERIC_CPU_DEVICES
 +	select GENERIC_LIB_ASHRDI3
++	select LOCK_MM_AND_FIND_VMA
 +
 +config MMU
 +	def_bool y
@@ -148,7 +149,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/Kbuild linux-wor
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/asm-extable.h linux-workdir/arch/xr17032/include/asm/asm-extable.h
 --- linux-clean/arch/xr17032/include/asm/asm-extable.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/asm-extable.h
-@@ -0,0 +1,54 @@
+@@ -0,0 +1,73 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -161,6 +162,23 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/asm-extable.h li
 +#define EX_TYPE_FIXUP			1
 +#define EX_TYPE_UACCESS_ERR_ZERO	2
 +
++#ifdef __ASSEMBLY__
++
++#define __ASM_EXTABLE_RAW(insn, fixup, type, data)	\
++	.pushsection	__ex_table, "a";		\
++	.balign		4;				\
++	.long		(insn);				\
++	.long		(fixup);			\
++	.short		(type);				\
++	.short		(data);				\
++	.popsection;
++
++.macro	_asm_extable, insn, fixup
++	__ASM_EXTABLE_RAW(\insn, \fixup, EX_TYPE_FIXUP, 0)
++.endm
++
++#else /* __ASSEMBLY__ */
++
 +#include <linux/bits.h>
 +#include <linux/stringify.h>
 +#include <asm/gpr-num.h>
@@ -168,8 +186,8 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/asm-extable.h li
 +#define __ASM_EXTABLE_RAW(insn, fixup, type, data)	\
 +	".pushsection	__ex_table, \"a\"\n"		\
 +	".balign	4\n"				\
-+	".long		(" insn ")\n"		\
-+	".long		(" fixup ")\n"		\
++	".long		(" insn ")\n"			\
++	".long		(" fixup ")\n"			\
 +	".short		(" type ")\n"			\
 +	".short		(" data ")\n"			\
 +	".popsection\n"
@@ -201,6 +219,8 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/asm-extable.h li
 +
 +#define _ASM_EXTABLE_UACCESS_ERR(insn, fixup, err)			\
 +	_ASM_EXTABLE_UACCESS_ERR_ZERO(insn, fixup, err, zero)
++
++#endif /* __ASSEMBLY__ */
 +
 +#endif /* _ASM_XR17032_ASM_EXTABLE_H */
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/atomic.h linux-workdir/arch/xr17032/include/asm/atomic.h
@@ -339,6 +359,24 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/barrier.h linux-
 +#include <asm-generic/barrier.h>
 +
 +#endif /* _ASM_XR17032_BARRIER_H */
+diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/bug.h linux-workdir/arch/xr17032/include/asm/bug.h
+--- linux-clean/arch/xr17032/include/asm/bug.h	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/include/asm/bug.h
+@@ -0,0 +1,14 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2025 monkuous
++ */
++
++#ifndef _ASM_XR17032_BUG_H
++#define _ASM_XR17032_BUG_H
++
++#include <asm-generic/bug.h>
++
++void __show_regs(struct pt_regs *regs);
++void die(struct pt_regs *regs, const char *str);
++
++#endif /* _ASM_XR17032_BUG_H */
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/cache.h linux-workdir/arch/xr17032/include/asm/cache.h
 --- linux-clean/arch/xr17032/include/asm/cache.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/cache.h
@@ -499,7 +537,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/cmpxchg.h linux-
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/cr.h linux-workdir/arch/xr17032/include/asm/cr.h
 --- linux-clean/arch/xr17032/include/asm/cr.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/cr.h
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,43 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -516,6 +554,10 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/cr.h linux-workd
 +#define RS_OLD_I	0x00000200UL
 +#define RS_OLD_M	0x00000400UL
 +#define RS_OLD_T	0x00000800UL
++
++#define RS_ECAUSE	0xf0000000UL
++#define RS_ECAUSE_PF_R	0xc0000000UL
++#define RS_ECAUSE_PF_W	0xd0000000UL
 +
 +#ifndef __ASSEMBLER__
 +
@@ -592,7 +634,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/elf.h linux-work
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/entry-common.h linux-workdir/arch/xr17032/include/asm/entry-common.h
 --- linux-clean/arch/xr17032/include/asm/entry-common.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/entry-common.h
-@@ -0,0 +1,11 @@
+@@ -0,0 +1,15 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -603,11 +645,15 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/entry-common.h l
 +
 +#include <asm/stacktrace.h>
 +
++void do_trap(struct pt_regs *regs, int signo, int code, unsigned long addr);
++
++void handle_page_fault(struct pt_regs *regs);
++
 +#endif /* _ASM_XR17032_ENTRY_COMMON_H */
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/extable.h linux-workdir/arch/xr17032/include/asm/extable.h
 --- linux-clean/arch/xr17032/include/asm/extable.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/extable.h
-@@ -0,0 +1,14 @@
+@@ -0,0 +1,18 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -616,10 +662,14 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/extable.h linux-
 +#ifndef _ASM_XR17032_EXTABLE_H
 +#define _ASM_XR17032_EXTABLE_H
 +
++#include <asm/ptrace.h>
++
 +struct exception_table_entry {
 +	unsigned long insn, fixup;
 +	short type, data;
 +};
++
++bool fixup_exception(struct pt_regs *regs);
 +
 +#endif /* _ASM_XR17032_EXTABLE_H */
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/fixmap.h linux-workdir/arch/xr17032/include/asm/fixmap.h
@@ -1321,7 +1371,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/processor.h linu
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/ptrace.h linux-workdir/arch/xr17032/include/asm/ptrace.h
 --- linux-clean/arch/xr17032/include/asm/ptrace.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/ptrace.h
-@@ -0,0 +1,70 @@
+@@ -0,0 +1,72 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -1370,6 +1420,8 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/ptrace.h linux-w
 +	unsigned long rs;
 +	unsigned long orig_a3;
 +};
++
++#define MAX_REG_OFFSET offsetof(struct pt_regs, pc)
 +
 +#define PTRACE_SYSEMU 0x1f
 +#define PTRACE_SYSEMU_SINGLESTEP 0x20
@@ -1622,7 +1674,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/tlbflush.h linux
 +#ifndef _ASM_XR17032_TLBFLUSH_H
 +#define _ASM_XR17032_TLBFLUSH_H
 +
-+#include <asm/pgtable.h>
++#include <asm/page.h>
 +#include <linux/mm_types.h>
 +
 +void flush_tlb_mm(struct mm_struct *mm);
@@ -2039,7 +2091,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/uapi/asm/sigcontext.
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/Makefile linux-workdir/arch/xr17032/kernel/Makefile
 --- linux-clean/arch/xr17032/kernel/Makefile	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/Makefile
-@@ -0,0 +1,16 @@
+@@ -0,0 +1,17 @@
 +# SPDX-License-Identifier: GPL-2.0-only
 +#
 +# Makefile for the XR/17032 Linux kernel
@@ -2047,6 +2099,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/Makefile linux-workdi
 +
 +always-$(KBUILD_BUILTIN)	+= vmlinux.lds
 +
++obj-y	+= context.o
 +obj-y	+= entry.o
 +obj-y	+= head.o
 +obj-y	+= irq.o
@@ -2132,7 +2185,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/asm-offsets.c linux-w
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/asm-stubs.S linux-workdir/arch/xr17032/kernel/asm-stubs.S
 --- linux-clean/arch/xr17032/kernel/asm-stubs.S	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/asm-stubs.S
-@@ -0,0 +1,20 @@
+@@ -0,0 +1,16 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -2146,29 +2199,171 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/asm-stubs.S linux-wor
 +	brk
 +SYM_FUNC_END(__asm_copy_from_user)
 +
-+SYM_FUNC_START(__asm_copy_to_user)
-+	brk
-+SYM_FUNC_END(__asm_copy_to_user)
-+
 +SYM_FUNC_START(__clear_user)
 +	brk
 +SYM_FUNC_END(__clear_user)
-diff -urN --no-dereference linux-clean/arch/xr17032/kernel/entry.c linux-workdir/arch/xr17032/kernel/entry.c
---- linux-clean/arch/xr17032/kernel/entry.c	1970-01-01 01:00:00.000000000 +0100
-+++ linux-workdir/arch/xr17032/kernel/entry.c
-@@ -0,0 +1,28 @@
+diff -urN --no-dereference linux-clean/arch/xr17032/kernel/context.c linux-workdir/arch/xr17032/kernel/context.c
+--- linux-clean/arch/xr17032/kernel/context.c	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/kernel/context.c
+@@ -0,0 +1,45 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
 + */
 +
++#include <asm/mmu_context.h>
++#include <linux/linkage.h>
++#include <linux/sched/mm.h>
++
++asmlinkage void xr17032_switch_mm(unsigned long pfn);
++
++static inline void set_mm(struct mm_struct *prev, struct mm_struct *next,
++			  unsigned int cpu)
++{
++	cpumask_set_cpu(cpu, mm_cpumask(next));
++	cpumask_clear_cpu(cpu, mm_cpumask(prev));
++
++	unsigned long flags = arch_local_irq_save();
++	xr17032_switch_mm(virt_to_pfn(next->pgd));
++	arch_local_irq_restore(flags);
++}
++
++static inline void flush_icache_deferred(struct mm_struct *mm, unsigned int cpu,
++					 struct task_struct *task)
++{
++#ifdef CONFIG_SMP
++	if (cpumask_test_and_clear_cpu(cpu, &mm->context.icache_stale_mask)) {
++		smp_mb();
++
++		if (!(task && switch_to_should_flush_icache(task)))
++			local_flush_icache_all();
++	}
++#endif
++}
++
++void switch_mm(struct mm_struct *prev, struct mm_struct *next,
++	       struct task_struct *task)
++{
++	if (unlikely(prev == next))
++		return;
++
++	unsigned int cpu = smp_processor_id();
++	set_mm(prev, next, cpu);
++	flush_icache_deferred(next, cpu, task);
++}
+diff -urN --no-dereference linux-clean/arch/xr17032/kernel/entry.c linux-workdir/arch/xr17032/kernel/entry.c
+--- linux-clean/arch/xr17032/kernel/entry.c	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/kernel/entry.c
+@@ -0,0 +1,134 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2025 monkuous
++ */
++
++#include <asm/bug.h>
 +#include <asm/irq_regs.h>
 +#include <asm/ptrace.h>
 +#include <linux/entry-common.h>
 +#include <linux/hardirq.h>
 +#include <linux/irq.h>
++#include <linux/kdebug.h>
 +#include <linux/linkage.h>
++#include <linux/mm.h>
 +#include <linux/panic.h>
++#include <linux/sched/debug.h>
++#include <linux/sched/signal.h>
++#include <linux/signal.h>
++
++int show_unhandled_signals = 1;
++
++static DEFINE_RAW_SPINLOCK(die_lock);
++
++static int copy_code(struct pt_regs *regs, u32 *val, const u32 *insns)
++{
++	const void __user *uaddr = (__force const void __user *)insns;
++
++	if (!user_mode(regs))
++		return get_kernel_nofault(*val, insns);
++
++	/* The user space code from other tasks cannot be accessed. */
++	if (regs != task_pt_regs(current))
++		return -EPERM;
++
++	return copy_from_user_nofault(val, uaddr, sizeof(*val));
++}
++
++static void dump_instr(const char *loglvl, struct pt_regs *regs)
++{
++	char str[sizeof("00000000 ") * 12 + 2 + 1], *p = str;
++	const u32 *insns = (u32 *)instruction_pointer(regs);
++
++	for (int i = -10; i < 2; i++) {
++		u32 val;
++		long bad = copy_code(regs, &val, &insns[i]);
++		if (!bad) {
++			p += sprintf(p, i == 0 ? "(%08x) " : "%08x ", val);
++		} else {
++			printk("%sCode: Unable to access instruction at 0x%px.\n",
++			       loglvl, &insns[i]);
++			return;
++		}
++	}
++
++	printk("%sCode: %s\n", loglvl, str);
++}
++
++void die(struct pt_regs *regs, const char *str)
++{
++	static int die_counter;
++	int ret;
++	long cause;
++	unsigned long flags;
++
++	oops_enter();
++
++	raw_spin_lock_irqsave(&die_lock, flags);
++	console_verbose();
++	bust_spinlocks(1);
++
++	pr_emerg("%s [#%d]\n", str, ++die_counter);
++	print_modules();
++	if (regs) {
++		show_regs(regs);
++		dump_instr(KERN_EMERG, regs);
++	}
++
++	cause = regs ? (regs->rs >> 28) : -1;
++	ret = notify_die(DIE_OOPS, str, regs, 0, cause, SIGSEGV);
++
++	bust_spinlocks(0);
++	add_taint(TAINT_DIE, LOCKDEP_NOW_UNRELIABLE);
++	raw_spin_unlock_irqrestore(&die_lock, flags);
++	oops_exit();
++
++	if (in_interrupt())
++		panic("Fatal exception in interrupt");
++	if (panic_on_oops)
++		panic("Fatal exception");
++	if (ret != NOTIFY_STOP)
++		make_task_dead(SIGSEGV);
++}
++
++void do_trap(struct pt_regs *regs, int signo, int code, unsigned long addr)
++{
++	struct task_struct *tsk = current;
++
++	if (show_unhandled_signals && unhandled_signal(tsk, signo)
++	    && printk_ratelimit()) {
++		pr_info("%s[%d]: unhandled signal %d code 0x%x at 0x%08lx",
++			tsk->comm, task_pid_nr(tsk), signo, code, addr);
++		print_vma_addr(KERN_CONT " in ", instruction_pointer(regs));
++		pr_cont("\n");
++		__show_regs(regs);
++		dump_instr(KERN_INFO, regs);
++	}
++
++	force_sig_fault(signo, code, (void __user *)addr);
++}
 +
 +#define TRAP_FUNC_PROTO(name) asmlinkage void name(struct pt_regs *regs)
 +#define TRAP_FUNC(name) TRAP_FUNC_PROTO(name); TRAP_FUNC_PROTO(name)
@@ -2185,10 +2380,19 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/entry.c linux-workdir
 +
 +	irqentry_exit(regs, state);
 +}
++
++TRAP_FUNC(xr17032_handle_page_fault)
++{
++	irqentry_state_t state = irqentry_enter(regs);
++
++	handle_page_fault(regs);
++
++	irqentry_exit(regs, state);
++}
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/arch/xr17032/kernel/head.S
 --- linux-clean/arch/xr17032/kernel/head.S	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/head.S
-@@ -0,0 +1,425 @@
+@@ -0,0 +1,454 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -2257,6 +2461,9 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/
 +	lui tp, zero, init_task
 +	ori tp, tp, init_task
 +
++	# value to write to scratch3
++	add s1, zero, t5 RSH 5
++
 +	# initial value for *tbindex and value to write to rs to enable paging
 +	addi s1, zero, 4
 +
@@ -2294,9 +2501,10 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/
 +	# enable paging
 +	mtcr rs, s1
 +
-+	# set up scratch registers for irq entry/exit
++	# set up scratch registers
 +	mtcr scratch1, zero
 +	mtcr scratch2, tp
++	mtcr scratch3, t5
 +
 +	# jump to virtual addressing (and out of exception block)
 +	jalr zero, t1, _start_kernel - .Lexception_block
@@ -2369,6 +2577,33 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/
 +	beq zero, 1b
 +SYM_CODE_END(syscall_entry)
 +
++.org 0x300
++SYM_CODE_START(xr17032_switch_mm)
++	# dtbtag value
++	lui t1, zero, (_PGD_ADDR >> 12)
++	ori t1, t1, (_PGD_ADDR >> 12)
++
++	# dtbpte value
++	add t2, zero, a0 LSH 5
++	ori t2, t2, 0x17 # global, kernel, writable, valid
++
++	# do switch
++	mfcr t0, dtbindex
++	mtcr dtbindex, zero
++	mtcr dtbtag, t1
++	mtcr dtbpte, t2
++	mtcr dtbindex, t0
++	mtcr scratch3, a0
++
++	# invalidate non-global tb entries
++	addi t0, zero, 2
++	mtcr itbctrl, t0
++	mtcr dtbctrl, t0
++
++	# return
++	jalr zero, lr, 0
++SYM_CODE_END(xr17032_switch_mm)
++
 +.org 0x400
 +SYM_CODE_START_LOCAL(bus_error_entry)
 +1:	hlt
@@ -2407,14 +2642,12 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/
 +
 +.org 0xc00
 +SYM_CODE_START_LOCAL(read_page_fault_entry)
-+1:	hlt
-+	beq zero, 1b
++	trap_entry xr17032_handle_page_fault
 +SYM_CODE_END(read_page_fault_entry)
 +
 +.org 0xd00
 +SYM_CODE_START_LOCAL(write_page_fault_entry)
-+1:	hlt
-+	beq zero, 1b
++	trap_entry xr17032_handle_page_fault
 +SYM_CODE_END(write_page_fault_entry)
 +
 +.org 0xe00
@@ -2637,16 +2870,19 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/irq.c linux-workdir/a
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/process.c linux-workdir/arch/xr17032/kernel/process.c
 --- linux-clean/arch/xr17032/kernel/process.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/process.c
-@@ -0,0 +1,58 @@
+@@ -0,0 +1,110 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
 + */
 +
++#include <asm/bug.h>
 +#include <linux/entry-common.h>
 +#include <linux/linkage.h>
++#include <linux/printk.h>
 +#include <linux/ptrace.h>
 +#include <linux/sched.h>
++#include <linux/sched/debug.h>
 +
 +asmlinkage void ret_from_fork_kernel_asm(void);
 +asmlinkage void ret_from_fork_kernel(void *fn_arg, int (*fn)(void *),
@@ -2695,6 +2931,55 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/process.c linux-workd
 +
 +	p->thread.sp = (unsigned long)childregs;
 +	return 0;
++}
++
++void flush_thread(void)
++{
++}
++
++void start_thread(struct pt_regs *regs, unsigned long pc, unsigned long sp)
++{
++	regs->rs = RS_OLD_M | RS_OLD_I | RS_OLD_U | RS_M;
++	regs->pc = pc;
++	regs->sp = sp;
++}
++
++void __show_regs(struct pt_regs *regs)
++{
++	show_regs_print_info(KERN_DEFAULT);
++
++	if (!user_mode(regs)) {
++		pr_cont(" pc : %pS\n", (void *)regs->pc);
++		pr_cont(" lr : %pS\n", (void *)regs->lr);
++	}
++
++	pr_cont(" t0 : %08lx t1 : %08lx t2 : %08lx\n",
++		regs->t0, regs->t1, regs->t2);
++	pr_cont(" t3 : %08lx t4 : %08lx t5 : %08lx\n",
++		regs->t3, regs->t4, regs->t5);
++	pr_cont(" a0 : %08lx a1 : %08lx a2 : %08lx\n",
++		regs->a0, regs->a1, regs->a2);
++	pr_cont(" a3 : %08lx s0 : %08lx s1 : %08lx\n",
++		regs->a3, regs->s0, regs->s1);
++	pr_cont(" s2 : %08lx s3 : %08lx s4 : %08lx\n",
++		regs->s2, regs->s3, regs->s4);
++	pr_cont(" s5 : %08lx s6 : %08lx s7 : %08lx\n",
++		regs->s5, regs->s6, regs->s7);
++	pr_cont(" s8 : %08lx s9 : %08lx s10: %08lx\n",
++		regs->s8, regs->s9, regs->s10);
++	pr_cont(" s11: %08lx s12: %08lx s13: %08lx\n",
++		regs->s11, regs->s12, regs->s13);
++	pr_cont(" s14: %08lx s15: %08lx s16: %08lx\n",
++		regs->s14, regs->s15, regs->s16);
++	pr_cont(" s17: %08lx tp : %08lx sp : %08lx\n",
++		regs->s17, regs->tp, regs->sp);
++	pr_cont(" lr : %08lx pc : %08lx rs : %08lx\n",
++		regs->lr, regs->pc, regs->rs);
++}
++
++void show_regs(struct pt_regs *regs)
++{
++	__show_regs(regs);
 +}
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/setup.c linux-workdir/arch/xr17032/kernel/setup.c
 --- linux-clean/arch/xr17032/kernel/setup.c	1970-01-01 01:00:00.000000000 +0100
@@ -2835,7 +3120,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/setup.c linux-workdir
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/stubs.c linux-workdir/arch/xr17032/kernel/stubs.c
 --- linux-clean/arch/xr17032/kernel/stubs.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/stubs.c
-@@ -0,0 +1,105 @@
+@@ -0,0 +1,73 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -2864,19 +3149,9 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/stubs.c linux-workdir
 +	panic("TODO arch_ptrace");
 +}
 +
-+void flush_thread(void)
-+{
-+	panic("TODO flush_thread");
-+}
-+
 +void flush_tlb_kernel_range(unsigned long start, unsigned long end)
 +{
 +	panic("TODO flush_tlb_kernel_range");
-+}
-+
-+void flush_tlb_mm(struct mm_struct *mm)
-+{
-+	panic("TODO flush_tlb_mm");
 +}
 +
 +void flush_tlb_mm_range(struct mm_struct *mm, unsigned long start,
@@ -2888,12 +3163,6 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/stubs.c linux-workdir
 +void flush_tlb_page(struct vm_area_struct *vma, unsigned long addr)
 +{
 +	panic("TODO flush_tlb_page");
-+}
-+
-+void flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
-+		     unsigned long end)
-+{
-+	panic("TODO flush_tlb_range");
 +}
 +
 +unsigned long __get_wchan(struct task_struct *task)
@@ -2921,25 +3190,9 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/stubs.c linux-workdir
 +	panic("TODO ptrace_disable");
 +}
 +
-+void show_regs(struct pt_regs *regs)
-+{
-+	panic("TODO show_regs");
-+}
-+
 +void show_stack(struct task_struct *task, unsigned long *sp, const char *loglvl)
 +{
 +	pr_cont("TODO show_stack\n");
-+}
-+
-+void start_thread(struct pt_regs *regs, unsigned long pc, unsigned long sp)
-+{
-+	panic("TODO start_thread");
-+}
-+
-+void switch_mm(struct mm_struct *prev, struct mm_struct *next,
-+	       struct task_struct *task)
-+{
-+	panic("TODO switch_mm");
 +}
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/time.c linux-workdir/arch/xr17032/kernel/time.c
 --- linux-clean/arch/xr17032/kernel/time.c	1970-01-01 01:00:00.000000000 +0100
@@ -3104,8 +3357,8 @@ diff -urN --no-dereference linux-clean/arch/xr17032/lib/Makefile linux-workdir/a
 +++ linux-workdir/arch/xr17032/lib/Makefile
 @@ -0,0 +1,3 @@
 +# SPDX-License-Identifier: GPL-2.0-only
-+lib-y += delay.o
-+lib-y += memset.o
++lib-y	+= delay.o
++lib-y	+= uaccess.o
 diff -urN --no-dereference linux-clean/arch/xr17032/lib/delay.c linux-workdir/arch/xr17032/lib/delay.c
 --- linux-clean/arch/xr17032/lib/delay.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/lib/delay.c
@@ -3138,23 +3391,508 @@ diff -urN --no-dereference linux-clean/arch/xr17032/lib/delay.c linux-workdir/ar
 +{
 +	__const_udelay(loops * UDELAY_CONST_MULT);
 +}
-diff -urN --no-dereference linux-clean/arch/xr17032/lib/memset.S linux-workdir/arch/xr17032/lib/memset.S
---- linux-clean/arch/xr17032/lib/memset.S	1970-01-01 01:00:00.000000000 +0100
-+++ linux-workdir/arch/xr17032/lib/memset.S
-@@ -0,0 +1,6 @@
+diff -urN --no-dereference linux-clean/arch/xr17032/lib/uaccess.S linux-workdir/arch/xr17032/lib/uaccess.S
+--- linux-clean/arch/xr17032/lib/uaccess.S	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/lib/uaccess.S
+@@ -0,0 +1,32 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
 + */
 +
++#include <asm/asm-extable.h>
 +#include <linux/linkage.h>
++
++.macro fixup dst, src, lbl
++100:	mov \dst, \src
++	_asm_extable 100b, \lbl
++.endm
++
++SYM_FUNC_START(__asm_copy_to_user)
++	add	t5, a0, a2
++
++	beq	a2, .Lout_copy_user
++1:	fixup	t0, byte [a1], .Lcopy_user_fail
++	addi	a1, a1, 1
++	fixup	byte [a0], t0, .Lcopy_user_fail
++	addi	a0, a0, 1
++	subi	a2, a2, 1
++	bne	a2, 1b
++
++.Lout_copy_user:
++	addi	a3, zero, 0
++	jalr	zero, lr, 0
++
++.Lcopy_user_fail:
++	sub	a3, t5, a0
++	jalr	zero, lr, 0
++SYM_FUNC_END(__asm_copy_to_user)
 diff -urN --no-dereference linux-clean/arch/xr17032/mm/Makefile linux-workdir/arch/xr17032/mm/Makefile
 --- linux-clean/arch/xr17032/mm/Makefile	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/mm/Makefile
-@@ -0,0 +1,3 @@
+@@ -0,0 +1,6 @@
 +# SPDX-License-Identifier: GPL-2.0-only
 +
++obj-y += extable.o
++obj-y += fault.o
 +obj-y += init.o
++obj-y += tlbflush.o
+diff -urN --no-dereference linux-clean/arch/xr17032/mm/extable.c linux-workdir/arch/xr17032/mm/extable.c
+--- linux-clean/arch/xr17032/mm/extable.c	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/mm/extable.c
+@@ -0,0 +1,66 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2025 monkuous
++ */
++
++#include <asm/asm-extable.h>
++#include <asm/bug.h>
++#include <asm/errno.h>
++#include <asm/extable.h>
++#include <asm/ptrace.h>
++#include <linux/bitfield.h>
++#include <linux/extable.h>
++
++static inline unsigned long
++get_ex_fixup(const struct exception_table_entry *ex)
++{
++	return ((unsigned long)&ex->fixup + ex->fixup);
++}
++
++static bool ex_handler_fixup(const struct exception_table_entry *ex,
++			     struct pt_regs *regs)
++{
++	regs->pc = get_ex_fixup(ex);
++	return true;
++}
++
++static inline void regs_set_gpr(struct pt_regs *regs, unsigned int offset,
++				unsigned long val)
++{
++	if (unlikely(offset > MAX_REG_OFFSET))
++		return;
++
++	if (offset)
++		*(unsigned long *)((unsigned long)regs + offset) = val;
++}
++
++static bool ex_handler_uaccess_err_zero(const struct exception_table_entry *ex,
++					struct pt_regs *regs)
++{
++	int reg_err = FIELD_GET(EX_DATA_REG_ERR, ex->data);
++	int reg_zero = FIELD_GET(EX_DATA_REG_ZERO, ex->data);
++
++	regs_set_gpr(regs, reg_err * sizeof(unsigned long), -EFAULT);
++	regs_set_gpr(regs, reg_zero * sizeof(unsigned long), 0);
++
++	regs->pc = get_ex_fixup(ex);
++	return true;
++}
++
++bool fixup_exception(struct pt_regs *regs)
++{
++	const struct exception_table_entry *ex;
++
++	ex = search_exception_tables(regs->pc);
++	if (!ex)
++		return false;
++
++	switch (ex->type) {
++	case EX_TYPE_FIXUP:
++		return ex_handler_fixup(ex, regs);
++	case EX_TYPE_UACCESS_ERR_ZERO:
++		return ex_handler_uaccess_err_zero(ex, regs);
++	}
++
++	BUG();
++}
+diff -urN --no-dereference linux-clean/arch/xr17032/mm/fault.c linux-workdir/arch/xr17032/mm/fault.c
+--- linux-clean/arch/xr17032/mm/fault.c	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/mm/fault.c
+@@ -0,0 +1,382 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2025 monkuous
++ */
++
++#include <asm/cr.h>
++#include <asm/extable.h>
++#include <asm/pgtable.h>
++#include <asm/siginfo.h>
++#include <linux/entry-common.h>
++#include <linux/kernel.h>
++#include <linux/kfence.h>
++#include <linux/kprobes.h>
++#include <linux/mm.h>
++#include <linux/sched.h>
++
++static void show_pte(unsigned long addr)
++{
++	pgd_t *pgdp, pgd;
++	p4d_t *p4dp, p4d;
++	pud_t *pudp, pud;
++	pmd_t *pmdp, pmd;
++	pte_t *ptep, pte;
++	struct mm_struct *mm = current->mm;
++
++	if (!mm)
++		mm = &init_mm;
++
++	pr_alert("Current %s pgtable: %luK pagesize, pgdp=0x%08lx\n",
++		 current->comm, PAGE_SIZE / SZ_1K, virt_to_phys(mm->pgd));
++
++	pgdp = pgd_offset(mm, addr);
++	pgd = pgdp_get(pgdp);
++	pr_alert("[%016lx] pgd=%016lx", addr, pgd_val(pgd));
++	if (pgd_none(pgd) || pgd_bad(pgd) || pgd_leaf(pgd))
++		goto out;
++
++	p4dp = p4d_offset(pgdp, addr);
++	p4d = p4dp_get(p4dp);
++	pr_cont(", p4d=%016lx", p4d_val(p4d));
++	if (p4d_none(p4d) || p4d_bad(p4d) || p4d_leaf(p4d))
++		goto out;
++
++	pudp = pud_offset(p4dp, addr);
++	pud = pudp_get(pudp);
++	pr_cont(", pud=%016lx", pud_val(pud));
++	if (pud_none(pud) || pud_bad(pud) || pud_leaf(pud))
++		goto out;
++
++	pmdp = pmd_offset(pudp, addr);
++	pmd = pmdp_get(pmdp);
++	pr_cont(", pmd=%016lx", pmd_val(pmd));
++	if (pmd_none(pmd) || pmd_bad(pmd) || pmd_leaf(pmd))
++		goto out;
++
++	ptep = pte_offset_map(pmdp, addr);
++	if (!ptep)
++		goto out;
++
++	pte = ptep_get(ptep);
++	pr_cont(", pte=%016lx", pte_val(pte));
++	pte_unmap(ptep);
++out:
++	pr_cont("\n");
++}
++
++static void die_kernel_fault(const char *msg, unsigned long addr,
++			     struct pt_regs *regs)
++{
++	bust_spinlocks(1);
++
++	pr_alert("Unable to handle kernel %s at virtual address 0x%08lx\n", msg,
++		 addr);
++
++	bust_spinlocks(0);
++	show_pte(addr);
++	die(regs, "Oops");
++	make_task_dead(SIGKILL);
++}
++
++static inline void no_context(struct pt_regs *regs, unsigned long addr)
++{
++	const char *msg;
++
++	/* Are we prepared to handle this kernel fault? */
++	if (fixup_exception(regs))
++		return;
++
++	/*
++	 * Oops. The kernel tried to access some bad page. We'll have to
++	 * terminate things with extreme prejudice.
++	 */
++	if (addr < PAGE_SIZE)
++		msg = "NULL pointer dereference";
++	else {
++		if (kfence_handle_page_fault(addr, (regs->rs & RS_ECAUSE)
++						   == RS_ECAUSE_PF_W, regs))
++			return;
++
++		msg = "paging request";
++	}
++
++	die_kernel_fault(msg, addr, regs);
++}
++
++
++static inline void mm_fault_error(struct pt_regs *regs, unsigned long addr, vm_fault_t fault)
++{
++	if (!user_mode(regs)) {
++		no_context(regs, addr);
++		return;
++	}
++
++	if (fault & VM_FAULT_OOM) {
++		/*
++		 * We ran out of memory, call the OOM killer, and return the userspace
++		 * (which will retry the fault, or kill us if we got oom-killed).
++		 */
++		pagefault_out_of_memory();
++		return;
++	} else if (fault & (VM_FAULT_SIGBUS | VM_FAULT_HWPOISON | VM_FAULT_HWPOISON_LARGE)) {
++		/* Kernel mode? Handle exceptions or die */
++		do_trap(regs, SIGBUS, BUS_ADRERR, addr);
++		return;
++	} else if (fault & VM_FAULT_SIGSEGV) {
++		do_trap(regs, SIGSEGV, SEGV_MAPERR, addr);
++		return;
++	}
++
++	BUG();
++}
++
++static inline void
++bad_area_nosemaphore(struct pt_regs *regs, int code, unsigned long addr)
++{
++	/*
++	 * Something tried to access memory that isn't in our memory map.
++	 * Fix it, but check if it's kernel or user first.
++	 */
++	/* User mode accesses just cause a SIGSEGV */
++	if (user_mode(regs)) {
++		do_trap(regs, SIGSEGV, code, addr);
++		return;
++	}
++
++	no_context(regs, addr);
++}
++
++static inline void
++bad_area(struct pt_regs *regs, struct mm_struct *mm, int code,
++	 unsigned long addr)
++{
++	mmap_read_unlock(mm);
++
++	bad_area_nosemaphore(regs, code, addr);
++}
++
++static inline void vmalloc_fault(struct pt_regs *regs, int code,
++				 unsigned long addr)
++{
++	/* User mode accesses just cause a SIGSEGV */
++	if (user_mode(regs))
++		return do_trap(regs, SIGSEGV, code, addr);
++
++	/*
++	 * Synchronize this task's top level page-table
++	 * with the 'reference' page table.
++	 *
++	 * Do _not_ use "tsk->active_mm->pgd" here.
++	 * We might be inside an interrupt in the middle
++	 * of a task switch.
++	 */
++	int index = pgd_index(addr);
++	unsigned long pfn = cr_read(scratch3);
++	pgd_t *pgd = (pgd_t *)pfn_to_virt(pfn) + index;
++	pgd_t *pgd_k = init_mm.pgd + index;
++
++	if (!pgd_present(pgdp_get(pgd_k))) {
++		no_context(regs, addr);
++		return;
++	}
++	set_pgd(pgd, pgdp_get(pgd_k));
++
++	p4d_t *p4d_k = p4d_offset(pgd_k, addr);
++	if (!p4d_present(p4dp_get(p4d_k))) {
++		no_context(regs, addr);
++		return;
++	}
++
++	pud_t *pud_k = pud_offset(p4d_k, addr);
++	if (!pud_present(pudp_get(pud_k))) {
++		no_context(regs, addr);
++		return;
++	}
++	if (pud_leaf(pudp_get(pud_k)))
++		goto flush_tlb;
++
++	/*
++	 * Since the vmalloc area is global, it is unnecessary
++	 * to copy individual PTEs
++	 */
++	pmd_t *pmd_k = pmd_offset(pud_k, addr);
++	if (!pmd_present(pmdp_get(pmd_k))) {
++		no_context(regs, addr);
++		return;
++	}
++	if (pmd_leaf(pmdp_get(pmd_k)))
++		goto flush_tlb;
++
++	/*
++	 * Make sure the actual PTE exists as well to
++	 * catch kernel vmalloc-area accesses to non-mapped
++	 * addresses. If we don't do this, this will just
++	 * silently loop forever.
++	 */
++	pte_t *pte_k = pte_offset_kernel(pmd_k, addr);
++	if (!pte_present(ptep_get(pte_k))) {
++		no_context(regs, addr);
++		return;
++	}
++
++flush_tlb:
++	local_flush_tlb_page(addr);
++}
++
++static inline bool access_error(unsigned long cause, struct vm_area_struct *vma)
++{
++	switch (cause) {
++	case 0xc:
++		/* Write implies read */
++		if (!(vma->vm_flags & (VM_READ | VM_WRITE))) {
++			return true;
++		}
++		break;
++	case 0xd:
++		if (!(vma->vm_flags & VM_WRITE)) {
++			return true;
++		}
++		break;
++	default:
++		panic("%s: unhandled cause %lu", __func__, cause);
++	}
++	return false;
++}
++
++void handle_page_fault(struct pt_regs *regs)
++{
++	unsigned long addr = cr_read(ebadaddr);
++	unsigned long cause = regs->rs >> 28;
++
++	if (kprobe_page_fault(regs, cause))
++		return;
++
++	int code = SEGV_MAPERR;
++
++	if (unlikely(addr >= VMALLOC_START && addr <= VMALLOC_END)) {
++		vmalloc_fault(regs, code, addr);
++		return;
++	}
++
++	if (!regs_irqs_disabled(regs))
++		local_irq_enable();
++
++	struct task_struct *tsk = current;
++	struct mm_struct *mm = tsk->mm;
++
++	if (unlikely(faulthandler_disabled() || !mm)) {
++		no_context(regs, addr);
++		return;
++	}
++
++	unsigned int flags = FAULT_FLAG_DEFAULT;
++
++	if (user_mode(regs))
++		flags |= FAULT_FLAG_USER;
++
++	if (!user_mode(regs) && addr < TASK_SIZE) {
++		if (fixup_exception(regs))
++			return;
++
++		die_kernel_fault("access to user memory without uaccess",
++				 addr, regs);
++	}
++
++	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, addr);
++
++	if (cause == 0xd)
++		flags |= FAULT_FLAG_WRITE;
++	if (!(flags & FAULT_FLAG_USER))
++		goto lock_mmap;
++
++	struct vm_area_struct *vma = lock_vma_under_rcu(mm, addr);
++	if (!vma)
++		goto lock_mmap;
++
++	if (unlikely(access_error(cause, vma))) {
++		vma_end_read(vma);
++		count_vm_vma_lock_event(VMA_LOCK_SUCCESS);
++		bad_area_nosemaphore(regs, SEGV_ACCERR, addr);
++		return;
++	}
++
++	vm_fault_t fault = handle_mm_fault(vma, addr,
++					   flags | FAULT_FLAG_VMA_LOCK, regs);
++	if (!(fault & (VM_FAULT_RETRY | VM_FAULT_COMPLETED)))
++		vma_end_read(vma);
++
++	if (!(fault & VM_FAULT_RETRY)) {
++		count_vm_vma_lock_event(VMA_LOCK_SUCCESS);
++		goto done;
++	}
++	count_vm_vma_lock_event(VMA_LOCK_RETRY);
++	if (fault & VM_FAULT_MAJOR)
++		flags |= FAULT_FLAG_TRIED;
++
++	if (fault_signal_pending(fault, regs)) {
++		if (!user_mode(regs))
++			no_context(regs, addr);
++		return;
++	}
++lock_mmap:
++
++retry:
++	vma = lock_mm_and_find_vma(mm, addr, regs);
++	if (unlikely(!vma)) {
++		bad_area_nosemaphore(regs, code, addr);
++		return;
++	}
++
++	/*
++	 * Ok, we have a good vm_area for this memory access, so
++	 * we can handle it.
++	 */
++	code = SEGV_ACCERR;
++
++	if (unlikely(access_error(cause, vma))) {
++		bad_area(regs, mm, code, addr);
++		return;
++	}
++
++	/*
++	 * If for any reason at all we could not handle the fault,
++	 * make sure we exit gracefully rather than endlessly redo
++	 * the fault.
++	 */
++	fault = handle_mm_fault(vma, addr, flags, regs);
++
++	/*
++	 * If we need to retry but a fatal signal is pending, handle the
++	 * signal first. We do not need to release the mmap_lock because it
++	 * would already be released in __lock_page_or_retry in mm/filemap.c.
++	 */
++	if (fault_signal_pending(fault, regs)) {
++		if (!user_mode(regs))
++			no_context(regs, addr);
++		return;
++	}
++
++	/* The fault is fully completed (including releasing mmap lock) */
++	if (fault & VM_FAULT_COMPLETED)
++		return;
++
++	if (unlikely(fault & VM_FAULT_RETRY)) {
++		flags |= FAULT_FLAG_TRIED;
++
++		/*
++		 * No need to mmap_read_unlock(mm) as we would
++		 * have already released it in __lock_page_or_retry
++		 * in mm/filemap.c.
++		 */
++		goto retry;
++	}
++
++	mmap_read_unlock(mm);
++
++done:
++	if (unlikely(fault & VM_FAULT_ERROR)) {
++		mm_fault_error(regs, addr, fault);
++		return;
++	}
++	return;
++}
 diff -urN --no-dereference linux-clean/arch/xr17032/mm/init.c linux-workdir/arch/xr17032/mm/init.c
 --- linux-clean/arch/xr17032/mm/init.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/mm/init.c
@@ -3391,6 +4129,86 @@ diff -urN --no-dereference linux-clean/arch/xr17032/mm/init.c linux-workdir/arch
 +	sparse_init();
 +	zone_sizes_init();
 +	memblock_dump_all();
++}
+diff -urN --no-dereference linux-clean/arch/xr17032/mm/tlbflush.c linux-workdir/arch/xr17032/mm/tlbflush.c
+--- linux-clean/arch/xr17032/mm/tlbflush.c	1970-01-01 01:00:00.000000000 +0100
++++ linux-workdir/arch/xr17032/mm/tlbflush.c
+@@ -0,0 +1,76 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2025 monkuous
++ */
++
++#include <asm/tlbflush.h>
++#include <linux/smp.h>
++
++#define FLUSH_TLB_MAX_SIZE	~0UL
++#define TLB_FLUSH_ALL_THRESHOLD 64
++
++static inline void local_flush_tlb_range(unsigned long start,
++					 unsigned long size)
++{
++	if (size == FLUSH_TLB_MAX_SIZE) {
++		local_flush_tlb_all();
++		return;
++	}
++
++	unsigned long nr_ptes_in_range = DIV_ROUND_UP(size, PAGE_SIZE);
++
++	if (nr_ptes_in_range > TLB_FLUSH_ALL_THRESHOLD) {
++		local_flush_tlb_all();
++		return;
++	}
++
++	for (unsigned long i = 0; i < nr_ptes_in_range; i++) {
++		local_flush_tlb_page(start);
++		start += PAGE_SIZE;
++	}
++}
++
++struct flush_tlb_range_data {
++	unsigned long start;
++	unsigned long size;
++};
++
++static void __ipi_flush_tlb_range_asid(void *info)
++{
++	struct flush_tlb_range_data *d = info;
++
++	local_flush_tlb_range(d->start, d->size);
++}
++
++static void __flush_tlb_range(struct mm_struct *mm,
++			      const struct cpumask *cmask,
++			      unsigned long start, unsigned long size)
++{
++	if (cpumask_empty(cmask))
++		return;
++
++	unsigned int cpu = get_cpu();
++
++	if (cpumask_any_but(cmask, cpu) >= nr_cpu_ids) {
++		local_flush_tlb_range(start, size);
++	} else {
++		struct flush_tlb_range_data ftd;
++		ftd.start = start;
++		ftd.size = size;
++		on_each_cpu_mask(cmask, __ipi_flush_tlb_range_asid, &ftd, 1);
++	}
++
++	put_cpu();
++}
++
++void flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
++		     unsigned long end)
++{
++	__flush_tlb_range(vma->vm_mm, mm_cpumask(vma->vm_mm), start,
++			  end - start);
++}
++
++void flush_tlb_mm(struct mm_struct *mm)
++{
++	__flush_tlb_range(mm, mm_cpumask(mm), 0, FLUSH_TLB_MAX_SIZE);
 +}
 diff -urN --no-dereference linux-clean/drivers/block/Kconfig linux-workdir/drivers/block/Kconfig
 --- linux-clean/drivers/block/Kconfig
