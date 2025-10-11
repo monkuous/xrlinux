@@ -10,7 +10,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/Kbuild linux-workdir/arch/xr
 diff -urN --no-dereference linux-clean/arch/xr17032/Kconfig linux-workdir/arch/xr17032/Kconfig
 --- linux-clean/arch/xr17032/Kconfig	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/Kconfig
-@@ -0,0 +1,41 @@
+@@ -0,0 +1,42 @@
 +# SPDX-License-Identifier: GPL-2.0-only
 +
 +config XR17032
@@ -34,6 +34,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/Kconfig linux-workdir/arch/x
 +	select XRARCH_RTC
 +	select GENERIC_ENTRY
 +	select HAVE_SYSCALL_TRACEPOINTS
++	select GENERIC_CPU_DEVICES
 +
 +config MMU
 +	def_bool y
