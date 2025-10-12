@@ -8,7 +8,7 @@ Linux port to [xr17032](https://github.com/xrarch)
   - compiler: functional but incomplete (lacking exception handling and most atomic rmw operations)
   - libgcc: blocked on compiler exception handling support
   - libstdc++: blocked on libgcc and glibc
-- linux kernel: functional but incomplete (lacking several drivers and smp support)
+- linux kernel: functional but incomplete (lacking mouse driver and smp support)
 
 ## Building
 
