@@ -6479,7 +6479,7 @@ diff -urN --no-dereference linux-clean/drivers/video/fbdev/Makefile linux-workdi
 diff -urN --no-dereference linux-clean/drivers/video/fbdev/kinnow.c linux-workdir/drivers/video/fbdev/kinnow.c
 --- linux-clean/drivers/video/fbdev/kinnow.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/drivers/video/fbdev/kinnow.c
-@@ -0,0 +1,209 @@
+@@ -0,0 +1,300 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -6493,9 +6493,19 @@ diff -urN --no-dereference linux-clean/drivers/video/fbdev/kinnow.c linux-workdi
 +
 +#define KINNOW_REGS_OFFSET	0x3000
 +#define KINNOW_REGS_SIZE	8
-+#define KINNOW_DISPLAY_SIZE	0
++
++#define KINNOW_DISPLAY_SIZE	0x00
++#define KINNOW_FEATURES		0x20
++
++#define KINNOW_FEATURE_PALETTE	0x01
++
++#define KINNOW_PALETTE_OFFSET	0x4000
 +
 +#define KINNOW_MEM_OFFSET	0x100000
++
++struct kinnowfb_par {
++	void __iomem *palette;
++};
 +
 +static const struct fb_fix_screeninfo kinnowfb_fix = {
 +	.id	= "kinnow",
@@ -6555,9 +6565,64 @@ diff -urN --no-dereference linux-clean/drivers/video/fbdev/kinnow.c linux-workdi
 +	0xccee88, 0xeeeeaa, 0xcceecc, 0xffffff
 +};
 +
++static int kinnowfb_setcolreg(unsigned regno, unsigned red, unsigned green,
++			      unsigned blue, unsigned transp,
++			      struct fb_info *info)
++{
++	struct kinnowfb_par *par = info->par;
++
++	if (!par->palette)
++		return 0;
++
++	if (regno >= ARRAY_SIZE(kinnowfb_palette))
++		return -EINVAL;
++
++	red >>= 8;
++	red &= 0xff;
++
++	green >>= 8;
++	green &= 0xff;
++
++	blue >>= 8;
++	blue &= 0xff;
++
++	unsigned value = (red << 16) | (green << 8) | blue;
++	writel(value, par->palette + regno * 4);
++
++	return 0;
++}
++
++static int kinnowfb_setcmap(struct fb_cmap *cmap, struct fb_info *info)
++{
++	struct kinnowfb_par *par = info->par;
++
++	if (!par->palette)
++		return 0;
++
++	if (cmap->start + cmap->len < cmap->start
++	    || cmap->start + cmap->len >= ARRAY_SIZE(kinnowfb_palette))
++		return -EINVAL;
++
++	for (u32 i = 0; i < cmap->len; i++) {
++		u32 red = (cmap->red[i] >> 8) & 0xff;
++		u32 green = (cmap->green[i] >> 8) & 0xff;
++		u32 blue = (cmap->blue[i] >> 8) & 0xff;
++
++		u32 value = (red << 16) | (green << 8) | blue;
++		writel(value, par->palette + (cmap->start + i) * 4);
++	}
++
++	return 0;
++}
++
 +static void kinnowfb_destroy(struct fb_info *info)
 +{
++	struct kinnowfb_par *par = info->par;
++
 +	fb_dealloc_cmap(&info->cmap);
++
++	if (par->palette)
++		iounmap(par->palette);
 +
 +	if (info->screen_base)
 +		iounmap(info->screen_base);
@@ -6568,6 +6633,8 @@ diff -urN --no-dereference linux-clean/drivers/video/fbdev/kinnow.c linux-workdi
 +static const struct fb_ops kinnowfb_ops = {
 +	.owner		= THIS_MODULE,
 +	FB_DEFAULT_IOMEM_OPS,
++	.fb_setcolreg	= kinnowfb_setcolreg,
++	.fb_setcmap	= kinnowfb_setcmap,
 +	.fb_destroy	= kinnowfb_destroy,
 +};
 +
@@ -6597,14 +6664,18 @@ diff -urN --no-dereference linux-clean/drivers/video/fbdev/kinnow.c linux-workdi
 +	u32 display_size = readl(regs + KINNOW_DISPLAY_SIZE);
 +	u32 width = display_size & 0xfff;
 +	u32 height = (display_size >> 12) & 0xfff;
++	u32 features = readl(regs + KINNOW_FEATURES);
 +
 +	iounmap(regs);
 +
 +	int ret;
-+	struct fb_info *info = framebuffer_alloc(0, &pdev->dev);
++	struct fb_info *info = framebuffer_alloc(sizeof(struct kinnowfb_par),
++						 &pdev->dev);
 +	if (!info)
 +		return -ENOMEM;
 +	platform_set_drvdata(pdev, info);
++
++	struct kinnowfb_par *par = info->par;
 +
 +	info->fix = kinnowfb_fix;
 +	info->fix.smem_start = res->start + KINNOW_MEM_OFFSET;
@@ -6624,6 +6695,26 @@ diff -urN --no-dereference linux-clean/drivers/video/fbdev/kinnow.c linux-workdi
 +		ret = -ENOMEM;
 +		goto fail_free_info;
 +	}
++
++	if (features & KINNOW_FEATURE_PALETTE) {
++		par->palette = ioremap(res->start + KINNOW_PALETTE_OFFSET,
++				       sizeof(kinnowfb_palette));
++
++		if (par->palette) {
++			for (int i = 0; i < ARRAY_SIZE(kinnowfb_palette); i++) {
++				writel(kinnowfb_palette[i],
++				       par->palette + i * 4);
++			}
++		} else {
++			// ioremap failure is not critical, it'll just make
++			// console colors incorrect
++			dev_warn(&pdev->dev, "failed to map palette");
++		}
++	}
++
++	if (!par->palette)
++		dev_warn(&pdev->dev,
++			 "palette is read-only, colors may be incorrect");
 +
 +	ret = fb_alloc_cmap(&info->cmap, ARRAY_SIZE(kinnowfb_palette), 0);
 +	if (ret)
