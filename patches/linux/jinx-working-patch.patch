@@ -6479,7 +6479,7 @@ diff -urN --no-dereference linux-clean/drivers/video/fbdev/Makefile linux-workdi
 diff -urN --no-dereference linux-clean/drivers/video/fbdev/kinnow.c linux-workdir/drivers/video/fbdev/kinnow.c
 --- linux-clean/drivers/video/fbdev/kinnow.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/drivers/video/fbdev/kinnow.c
-@@ -0,0 +1,211 @@
+@@ -0,0 +1,209 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -6598,12 +6598,12 @@ diff -urN --no-dereference linux-clean/drivers/video/fbdev/kinnow.c linux-workdi
 +	u32 width = display_size & 0xfff;
 +	u32 height = (display_size >> 12) & 0xfff;
 +
++	iounmap(regs);
++
 +	int ret;
 +	struct fb_info *info = framebuffer_alloc(0, &pdev->dev);
-+	if (!info) {
-+		ret = -ENOMEM;
-+		goto fail_free_regs;
-+	}
++	if (!info)
++		return -ENOMEM;
 +	platform_set_drvdata(pdev, info);
 +
 +	info->fix = kinnowfb_fix;
@@ -6658,8 +6658,6 @@ diff -urN --no-dereference linux-clean/drivers/video/fbdev/kinnow.c linux-workdi
 +
 +fail_free_info:
 +	framebuffer_release(info);
-+fail_free_regs:
-+	iounmap(regs);
 +	return ret;
 +}
 +

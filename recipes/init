@@ -40,9 +40,18 @@ static ssize_t write(int fd, const void *buf, size_t count) {
 }
 
 void _start(void) {
-    static const char message[] = "Hello from userspace!\n";
+    static const char message1[] = "Hello from userspace!\n";
+    static const char message2[] = "Got data: ";
+    char buffer[256];
 
-    write(STDOUT_FILENO, message, sizeof(message) - 1);
+    write(STDOUT_FILENO, message1, sizeof(message1) - 1);
+
+    ssize_t count = read(STDIN_FILENO, buffer, sizeof(buffer));
+
+    if (count >= 0) {
+        write(STDOUT_FILENO, message2, sizeof(message2) - 1);
+        write(STDOUT_FILENO, buffer, count);
+    }
 
     __builtin_trap();
 }
