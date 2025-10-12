@@ -614,7 +614,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/cmpxchg.h linux-
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/cr.h linux-workdir/arch/xr17032/include/asm/cr.h
 --- linux-clean/arch/xr17032/include/asm/cr.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/cr.h
-@@ -0,0 +1,43 @@
+@@ -0,0 +1,44 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -633,6 +633,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/cr.h linux-workd
 +#define RS_OLD_T	0x00000800UL
 +
 +#define RS_ECAUSE	0xf0000000UL
++#define RS_ECAUSE_SYS	0x20000000UL
 +#define RS_ECAUSE_PF_R	0xc0000000UL
 +#define RS_ECAUSE_PF_W	0xd0000000UL
 +
@@ -1631,7 +1632,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/syscall.h linux-
 +
 +static inline int syscall_get_nr(struct task_struct *task, struct pt_regs *regs)
 +{
-+	return regs->a0;
++	return regs->t5;
 +}
 +
 +static inline void syscall_rollback(struct task_struct *task,
@@ -1650,12 +1651,12 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/syscall.h linux-
 +					 struct pt_regs *regs,
 +					 unsigned long *args)
 +{
-+	args[0] = regs->t0;
-+	args[1] = regs->t1;
-+	args[2] = regs->t2;
-+	args[3] = regs->t3;
-+	args[4] = regs->t4;
-+	args[5] = regs->t5;
++	args[0] = regs->a0;
++	args[1] = regs->a1;
++	args[2] = regs->a2;
++	args[3] = regs->orig_a3;
++	args[4] = regs->t0;
++	args[5] = regs->t1;
 +}
 +
 +static inline bool arch_syscall_is_vdso_sigreturn(struct pt_regs *regs)
@@ -1688,7 +1689,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/syscall_wrapper.
 +asmlinkage long __xr17032_sys_ni_syscall(const struct pt_regs *__unused);
 +
 +/*
-+ * Use type aliasing to ensure registers t0-t5 are correctly passed to the syscall
++ * Use type aliasing to ensure registers are correctly passed to the syscall
 + * implementation when >word-size arguments are used.
 + */
 +#define __SYSCALL_SE_DEFINEx(x, prefix, name, ...)					\
@@ -1703,7 +1704,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/syscall_wrapper.
 +	static long ___se_##prefix##name(__MAP(x,__SC_LONG,__VA_ARGS__))
 +
 +#define SC_XR17032_REGS_TO_ARGS(x, ...) \
-+	regs->t0,regs->t1,regs->t2,regs->t3,regs->t4,regs->t5
++	regs->a0,regs->a1,regs->a2,regs->orig_a3,regs->t0,regs->t1
 +
 +#define __SYSCALL_DEFINEx(x, name, ...)						\
 +	asmlinkage long __xr17032_sys##name(const struct pt_regs *regs);	\
@@ -2652,7 +2653,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/entry.c linux-workdir
 +		irqentry_nmi_exit(regs, state);
 +	}
 +
-+	long syscall = regs->a0;
++	long syscall = regs->t5;
 +
 +	regs->orig_a3 = regs->a3;
 +	regs->a3 = -ENOSYS;
@@ -2749,7 +2750,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/entry.c linux-workdir
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/arch/xr17032/kernel/head.S
 --- linux-clean/arch/xr17032/kernel/head.S	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/head.S
-@@ -0,0 +1,447 @@
+@@ -0,0 +1,456 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -2759,6 +2760,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/
 +#include <asm/page.h>
 +#include <asm/pgtable.h>
 +#include <asm/thread_info.h>
++#include <asm/unistd.h>
 +#include <generated/asm-offsets.h>
 +#include <linux/init.h>
 +#include <linux/linkage.h>
@@ -3191,6 +3193,14 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/
 +	jalr zero, lr, 0
 +SYM_CODE_END(__switch_to)
 +
++.section ".rodata", "a", %progbits
++
++.balign 4
++SYM_DATA_START(__user_rt_sigreturn)
++	addi t5, zero, __NR_rt_sigreturn
++	sys
++SYM_DATA_END(__user_rt_sigreturn)
++
 +.bss
 +
 +.balign 4
@@ -3470,15 +3480,21 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/setup.c linux-workdir
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/signal.c linux-workdir/arch/xr17032/kernel/signal.c
 --- linux-clean/arch/xr17032/kernel/signal.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/signal.c
-@@ -0,0 +1,66 @@
+@@ -0,0 +1,249 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
 + */
 +
++#include <asm/cr.h>
 +#include <asm/ucontext.h>
++#include <linux/entry-common.h>
 +#include <linux/signal.h>
 +#include <linux/syscalls.h>
++
++extern u32 __user_rt_sigreturn[2];
++
++#define DEBUG_SIG 0
 +
 +struct rt_sigframe {
 +	struct siginfo info;
@@ -3536,6 +3552,183 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/signal.c linux-workdi
 +	}
 +	force_sig(SIGSEGV);
 +	return 0;
++}
++
++static long setup_sigcontext(struct rt_sigframe __user *frame,
++	struct pt_regs *regs)
++{
++	struct sigcontext __user *sc = &frame->uc.uc_mcontext;
++	long err;
++
++	/* sc_regs is structured the same as the start of pt_regs */
++	err = __copy_to_user(&sc->sc_regs, regs, sizeof(sc->sc_regs));
++
++	return err;
++}
++
++static inline void __user *get_sigframe(struct ksignal *ksig,
++	struct pt_regs *regs, size_t framesize)
++{
++	unsigned long sp;
++	/* Default to using normal stack */
++	sp = regs->sp;
++
++	/*
++	 * If we are on the alternate signal stack and would overflow it, don't.
++	 * Return an always-bogus address instead so we will die with SIGSEGV.
++	 */
++	if (on_sig_stack(sp) && !likely(on_sig_stack(sp - framesize)))
++		return (void __user __force *)(-1UL);
++
++	/* This is the X/Open sanctioned signal stack switching. */
++	sp = sigsp(sp, ksig) - framesize;
++
++	/* Align the stack frame. */
++	sp &= ~0x3UL;
++
++	return (void __user *)sp;
++}
++
++
++static int setup_rt_frame(struct ksignal *ksig, sigset_t *set,
++	struct pt_regs *regs)
++{
++	struct rt_sigframe __user *frame;
++	size_t frame_size = sizeof(*frame);
++
++	frame = get_sigframe(ksig, regs, frame_size);
++	if (!access_ok(frame, frame_size))
++		return -EFAULT;
++
++	long err = copy_siginfo_to_user(&frame->info, &ksig->info);
++
++	/* Create the ucontext. */
++	err |= __put_user(0, &frame->uc.uc_flags);
++	err |= __put_user(NULL, &frame->uc.uc_link);
++	err |= __save_altstack(&frame->uc.uc_stack, regs->sp);
++	err |= setup_sigcontext(frame, regs);
++	err |= __copy_to_user(&frame->uc.uc_sigmask, set, sizeof(*set));
++	if (err)
++		return -EFAULT;
++
++	/* Set up to return from userspace. */
++	/*
++	 * TODO: For now we don't have a vDSO. Instead we push two
++	 * instructions to call the rt_sigreturn syscall onto the user stack
++	 */
++	if (copy_to_user(&frame->sigreturn_code, __user_rt_sigreturn,
++		sizeof(frame->sigreturn_code)))
++		return -EFAULT;
++
++	unsigned long addr = (unsigned long)&frame->sigreturn_code;
++	/* Make sure the two instructions are pushed to icache. */
++	flush_icache_range(addr, addr + sizeof(frame->sigreturn_code));
++
++	regs->lr = addr;
++
++	/*
++	 * Set up registers for signal handler.
++	 * Registers that we don't modify keep the value they had from
++	 * user-space at the time we took the signal.
++	 * We always pass siginfo and mcontext, regardless of SA_SIGINFO,
++	 * since some things rely on this (e.g. glibc's debug/segfault.c).
++	 */
++	regs->pc = (unsigned long)ksig->ka.sa.sa_handler;
++	regs->sp = (unsigned long)frame;
++	regs->a0 = ksig->sig;                     /* a0: signal number */
++	regs->a1 = (unsigned long)(&frame->info); /* a1: siginfo pointer */
++	regs->a2 = (unsigned long)(&frame->uc);   /* a2: ucontext pointer */
++
++#if DEBUG_SIG
++	pr_info("SIG deliver (%s:%d): sig=%d pc=%p lr=%p sp=%p\n",
++		current->comm, task_pid_nr(current), ksig->sig,
++		(void *)regs->pc, (void *)regs->lr, frame);
++#endif
++
++	return 0;
++}
++
++static void handle_signal(struct ksignal *ksig, struct pt_regs *regs)
++{
++	sigset_t *oldset = sigmask_to_save();
++	int ret;
++
++	rseq_signal_deliver(ksig, regs);
++
++	/* Set up the stack frame */
++	ret = setup_rt_frame(ksig, oldset, regs);
++
++	signal_setup_done(ret, ksig, 0);
++}
++
++
++void arch_do_signal_or_restart(struct pt_regs *regs)
++{
++	unsigned long continue_addr = 0, restart_addr = 0;
++	int retval = 0;
++	struct ksignal ksig;
++	bool syscall = (regs->rs & RS_ECAUSE) == RS_ECAUSE_SYS;
++
++	/* If we were from a system call, check for system call restarting */
++	if (syscall) {
++		continue_addr = regs->pc;
++		restart_addr = continue_addr - 4;
++		retval = regs->a3;
++
++		/* Avoid additional syscall restarting via ret_from_exception */
++		regs->rs &= ~RS_ECAUSE;
++
++		/*
++		 * Prepare for system call restart. We do this here so that a
++		 * debugger will see the already changed PC.
++		 */
++		switch (retval) {
++		case -ERESTARTNOHAND:
++		case -ERESTARTSYS:
++		case -ERESTARTNOINTR:
++		case -ERESTART_RESTARTBLOCK:
++			regs->a3 = regs->orig_a3;
++			regs->pc = restart_addr;
++			break;
++		}
++	}
++
++	/*
++	 * Get the signal to deliver. When running under ptrace, at this point
++	 * the debugger may change all of our registers.
++	 */
++	if (get_signal(&ksig)) {
++		/*
++		 * Depending on the signal settings, we may need to revert the
++		 * decision to restart the system call, but skip this if a
++		 * debugger has chosen to restart at a different PC.
++		 */
++		if (regs->pc == restart_addr &&
++		    (retval == -ERESTARTNOHAND ||
++		     retval == -ERESTART_RESTARTBLOCK ||
++		     (retval == -ERESTARTSYS &&
++		      !(ksig.ka.sa.sa_flags & SA_RESTART)))) {
++			regs->a3 = -EINTR;
++			regs->pc = continue_addr;
++		}
++
++		/* Actually deliver the signal */
++		handle_signal(&ksig, regs);
++		return;
++	}
++
++	/*
++	 * Handle restarting a different system call. As above, if a debugger
++	 * has chosen to restart at a different PC, ignore the restart.
++	 */
++	if (syscall && regs->pc == restart_addr && retval == -ERESTART_RESTARTBLOCK)
++		regs->t5 = __NR_restart_syscall;
++
++	/*
++	 * If there is no signal to deliver, we just put the saved
++	 * sigmask back.
++	 */
++	restore_saved_sigmask();
 +}
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/stubs.c linux-workdir/arch/xr17032/kernel/stubs.c
 --- linux-clean/arch/xr17032/kernel/stubs.c	1970-01-01 01:00:00.000000000 +0100
