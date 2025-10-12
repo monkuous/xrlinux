@@ -1088,7 +1088,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/pgalloc.h linux-
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/pgtable.h linux-workdir/arch/xr17032/include/asm/pgtable.h
 --- linux-clean/arch/xr17032/include/asm/pgtable.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/pgtable.h
-@@ -0,0 +1,307 @@
+@@ -0,0 +1,313 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -1189,6 +1189,12 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/pgtable.h linux-
 +
 +#define pgd_ERROR(e) \
 +	pr_err("%s:%d: bad pgd " PTE_FMT ".\n", __FILE__, __LINE__, pgd_val(e))
++
++#define pgprot_noncached pgprot_noncached
++static inline pgprot_t pgprot_noncached(pgprot_t _prot)
++{
++	return __pgprot(pgprot_val(_prot) | _PAGE_NO_CACHE);
++}
 +
 +static inline pte_t pfn_pte(unsigned long pfn, pgprot_t prot)
 +{
