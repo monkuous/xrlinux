@@ -29,7 +29,7 @@
 
 #define BX_AMTSU_BASE 0xf800'00c0
 #define BX_AMTSU_SIZE 20
-#define BX_AMTSU_IRQ 0x30
+#define BX_AMTSU_IRQ 0x31
 #define BX_AMTSU_NIRQ 4
 
 #define BX_BOARD_SIZE 0x800'0000
