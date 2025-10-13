@@ -3,6 +3,7 @@
 #include "compiler.h"
 #include "logging.h"
 #include "platform.h"
+#include "platformdefs.h"
 
 struct FwDeviceDatabase *BxDeviceDatabase;
 struct FwApiTable *BxApiTable;
@@ -14,7 +15,7 @@ void BxPrintCharacter(unsigned char c) {
 }
 
 bool BxReadFromDisk(void *buffer, uint64_t sector, size_t count) {
-    if ((uintptr_t)buffer & 511) BlCrash("BxReadFromDisk: unaligned buffer");
+    if ((uintptr_t)buffer & BL_SECTOR_MASK) BlCrash("BxReadFromDisk: unaligned buffer");
 
     uint64_t end = sector + count;
     if (end < sector) return false;

@@ -2,53 +2,69 @@
 #include "compiler.h"
 #include "config.h"
 #include "filesystem.h"
+#include "list.h"
 #include "logging.h"
 #include "platform.h"
 #include "platformdefs.h"
 
 #define BI_BCACHE_SHIFT 12
-#define BI_BCACHE_LINES 64
-#define BI_BCACHE_SETS 2
-
 #define BI_BCACHE_SIZE (1u << BI_BCACHE_SHIFT)
 #define BI_BCACHE_MASK (BI_BCACHE_SIZE - 1)
 
 _Static_assert(BI_BCACHE_SHIFT >= BL_SECTOR_SHIFT, "BI_BCACHE_SHIFT must be larger than BL_SECTOR_SHIFT");
-_Static_assert((BI_BCACHE_LINES & (BI_BCACHE_LINES - 1)) == 0, "BI_BCACHE_LINES must be a power of two");
 
-_Alignas(BL_BCACHE_ALIGN) static unsigned char BiBufferCache[BI_BCACHE_LINES][BI_BCACHE_SETS][BI_BCACHE_SIZE];
-static uint64_t BiBufferCacheCurrent[BI_BCACHE_LINES][BI_BCACHE_SETS];
+#define BL_BCACHE_COUNT 16
 
-static void *BiGetBcacheEntry(uint64_t block) {
-    uint64_t id = block + 1;
-    size_t line = block & (BI_BCACHE_LINES - 1);
-    size_t set = 0;
+struct BiBCacheMeta {
+    struct BlListNode Node;
+    uint64_t Block;
+    void *Data;
+};
 
-    for (size_t i = 0; i < BI_BCACHE_SETS; i++) {
-        uint64_t currentInSet = BiBufferCacheCurrent[line][i];
+_Alignas(BL_BCACHE_ALIGN) static unsigned char BiBCacheData[BL_BCACHE_COUNT][BI_BCACHE_SIZE];
+static struct BiBCacheMeta BiBCacheMeta[BL_BCACHE_COUNT];
+static size_t BiBCacheUsed;
 
-        if (currentInSet == id) return BiBufferCache[line][i];
-        if (currentInSet == 0 && set == 0) set = i;
+static struct BlList BiBCache;
+
+static void *BiGetBCacheEntry(uint64_t block) {
+    BL_LIST_FOREACH(BiBCache, struct BiBCacheMeta, Node, entry) {
+        if (entry->Block == block) {
+            BlListRemove(&BiBCache, &entry->Node);
+            BlListInsertAfter(&BiBCache, nullptr, &entry->Node);
+            return entry->Data;
+        }
+    }
+
+    struct BiBCacheMeta *entry;
+
+    if (BiBCacheUsed < BL_BCACHE_COUNT) {
+        entry = &BiBCacheMeta[BiBCacheUsed];
+        entry->Data = &BiBCacheData[BiBCacheUsed];
+        BiBCacheUsed += 1;
+    } else {
+        entry = BL_CONTAINER(struct BiBCacheMeta, Node, BiBCache.Tail);
+        BlListRemove(&BiBCache, &entry->Node);
     }
 
     if (!BxReadFromDisk(
-            BiBufferCache[line][set],
+            entry->Data,
             block << (BI_BCACHE_SHIFT - BL_SECTOR_SHIFT),
             1ull << (BI_BCACHE_SHIFT - BL_SECTOR_SHIFT)
         )) {
         BlCrash("failed to read from disk");
     }
 
-    BiBufferCacheCurrent[line][set] = id;
-    return BiBufferCache[line][set];
+    entry->Block = block;
+    BlListInsertAfter(&BiBCache, nullptr, &entry->Node);
+
+    return entry->Data;
 }
 
 static void BiReadFromDisk(void *buffer, uint64_t position, size_t count, bool bypassCache) {
     if (bypassCache) {
-        size_t mask = (1U << BL_SECTOR_SHIFT) - 1;
-
-        if (position & mask) BlCrash("BiReadFromDisk: unaligned position");
-        if (count & mask) BlCrash("BiReadFromDisk: unaligned size");
+        if (position & BL_SECTOR_MASK) BlCrash("BiReadFromDisk: unaligned position");
+        if (count & BL_SECTOR_MASK) BlCrash("BiReadFromDisk: unaligned size");
 
         BxReadFromDisk(buffer, position >> BL_SECTOR_SHIFT, count >> BL_SECTOR_SHIFT);
     } else {
@@ -57,7 +73,7 @@ static void BiReadFromDisk(void *buffer, uint64_t position, size_t count, bool b
             size_t offset = position & BI_BCACHE_MASK;
             size_t current = BL_MIN(BI_BCACHE_SIZE - offset, count);
 
-            BlCopyMemory(buffer, BiGetBcacheEntry(block) + offset, current);
+            BlCopyMemory(buffer, BiGetBCacheEntry(block) + offset, current);
 
             buffer += current;
             position += current;
