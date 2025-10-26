@@ -2798,8 +2798,8 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/
 +	addi t0, zero, 3
 +
 +	# virtual address of exception block
-+	lui t1, zero, .Lexception_block
-+	ori t1, t1, .Lexception_block
++	lui t1, zero, %hi(.Lexception_block)
++	ori t1, t1, %lo(.Lexception_block)
 +
 +	# itbtag value for exception block
 +	add t2, zero, t1 RSH 12
@@ -2809,8 +2809,8 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/
 +	ori t3, t3, 0x17 # global, kernel, writable, valid
 +
 +	# dtbtag value for page table
-+	lui t4, zero, (_PGD_ADDR >> 12)
-+	ori t4, t4, (_PGD_ADDR >> 12)
++	lui t4, zero, %hi(_PGD_ADDR >> 12)
++	ori t4, t4, %lo(_PGD_ADDR >> 12)
 +
 +	# dtbpte value for page table
 +	add t5, zero, s0 RSH 7
@@ -2822,12 +2822,12 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/
 +	mov long [s0 + ((_PGTABLE_ADDR >> 22) * 4)], t5
 +
 +	# value to write to *tbaddr
-+	lui s0, zero, _PGTABLE_ADDR
-+	ori s0, s0, _PGTABLE_ADDR
++	lui s0, zero, %hi(_PGTABLE_ADDR)
++	ori s0, s0, %lo(_PGTABLE_ADDR)
 +
 +	# value to write to scratch2
-+	lui tp, zero, init_task
-+	ori tp, tp, init_task
++	lui tp, zero, %hi(init_task)
++	ori tp, tp, %lo(init_task)
 +
 +	# value to write to scratch3
 +	add s1, zero, t5 RSH 5
@@ -3036,8 +3036,8 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/
 +	mtcr itbctrl, t0
 +
 +	# get a logical cpu id
-+	lui t0, zero, num_started_cpus
-+	ori t0, t0, num_started_cpus
++	lui t0, zero, %hi(num_started_cpus)
++	ori t0, t0, %lo(num_started_cpus)
 +1:	ll a0, t0
 +	addi t1, a0, 1
 +	sc t1, t0, t1
@@ -3055,20 +3055,20 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/
 +	bne a0, .Lpark_cpu
 +
 +	# set up boot_cpu_hwid
-+	lui t0, zero, boot_cpu_hwid
-+	ori t0, t0, boot_cpu_hwid
++	lui t0, zero, %hi(boot_cpu_hwid)
++	ori t0, t0, %lo(boot_cpu_hwid)
 +	mfcr t1, whami
 +	mov long [t0], t1
 +
 +	# set up c environment
-+	lui sp, zero, init_thread_union + THREAD_SIZE - PT_SIZE_ON_STACK
-+	ori sp, sp, init_thread_union + THREAD_SIZE - PT_SIZE_ON_STACK
++	lui sp, zero, %hi(init_thread_union + THREAD_SIZE - PT_SIZE_ON_STACK)
++	ori sp, sp, %lo(init_thread_union + THREAD_SIZE - PT_SIZE_ON_STACK)
 +
 +	addi s0, zero, 0
 +
 +	# wait until all cpus have entered the kernel
-+	lui t0, zero, num_started_cpus
-+	ori t0, t0, num_started_cpus
++	lui t0, zero, %hi(num_started_cpus)
++	ori t0, t0, %lo(num_started_cpus)
 +1:	mov t1, long [t0]
 +	slt t1, t1, a2
 +	bne t1, 1b

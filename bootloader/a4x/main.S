@@ -11,17 +11,17 @@ BxBootMagic: .long 0x676f646e
 .type BxStartup, @function
 BxStartup:
     # zero out bss
-    lui t0, zero, BxBssStart - 4
-    ori t0, t0, BxBssStart - 4
-    lui t1, zero, BxBssSize
-    ori t1, t1, BxBssSize
+    lui t0, zero, %hi(BxBssStart - 4)
+    ori t0, t0, %lo(BxBssStart - 4)
+    lui t1, zero, %hi(BxBssSize)
+    ori t1, t1, %lo(BxBssSize)
     beq t1, 2f
-1:  mov long [t0 + t1], zero
+1:  mov long [t0 + t1 LSH 0], zero
     subi t1, t1, 4
     bne t1, 1b
 2:  # save data necessary for BxReturnToFirmware
-    lui t0, zero, BxFirmwareRegisters
-    ori t0, t0, BxFirmwareRegisters
+    lui t0, zero, %hi(BxFirmwareRegisters)
+    ori t0, t0, %lo(BxFirmwareRegisters)
     mov long [t0 + 0x00], s0
     mov long [t0 + 0x04], s1
     mov long [t0 + 0x08], s2
@@ -45,8 +45,8 @@ BxStartup:
     # jump to real entry point
     mfcr t0, rs
     mtcr rs, zero
-    lui sp, zero, .LstackTop
-    ori sp, sp, .LstackTop
+    lui sp, zero, %hi(.LstackTop)
+    ori sp, sp, %lo(.LstackTop)
     mtcr rs, t0
     addi s0, zero, 0
     jal BxMain
@@ -59,8 +59,8 @@ BxStartup:
 .globl BxReturnToFirmware
 .type BxReturnToFirmware, @function
 BxReturnToFirmware:
-    lui t0, zero, BxFirmwareRegisters
-    ori t0, t0, BxFirmwareRegisters
+    lui t0, zero, %hi(BxFirmwareRegisters)
+    ori t0, t0, %lo(BxFirmwareRegisters)
     mov s0, long [t0 + 0x00]
     mov s1, long [t0 + 0x04]
     mov s2, long [t0 + 0x08]

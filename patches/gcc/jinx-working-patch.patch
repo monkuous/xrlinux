@@ -1930,8 +1930,8 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +	(match_operand:SI 1 "immediate_operand" "nS,R"))]
 +  ""
 +  "@
-+   lui\t%0,zero,%1\;ori\t%0,%0,%1
-+   adr\t%0,%1\;addi\t%0,%0,%%pcrel(%1+4)"
++   lui\t%0,zero,%%hi(%1)\;ori\t%0,%0,%%lo(%1)
++   1:\;adr\t%0,%%pcrel_hi(%1)\;addi\t%0,%0,%%pcrel_lo(1b)"
 +  [(set (attr "length")
 +	(const_int 8))])
 +

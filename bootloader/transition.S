@@ -9,8 +9,8 @@ BlTransition:
     mtcr icachectrl, t0
 
     # load address of page table into t0
-    lui s0, zero, BlPageTable
-    ori s0, s0, BlPageTable
+    lui s0, zero, %hi(BlPageTable)
+    ori s0, s0, %lo(BlPageTable)
 
     # jump to entrypoint
     jalr zero, a0, 0
