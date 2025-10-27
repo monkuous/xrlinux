@@ -5,9 +5,9 @@ Linux port to [xr17032](https://github.com/xrarch)
 
 - binutils: functional but incomplete (lacking diagnostics and pseudo-instruction support)
 - gcc:
-  - compiler: functional but incomplete (lacking exception handling and most atomic rmw operations)
-  - libgcc: blocked on compiler exception handling support
-  - libstdc++: blocked on libgcc and glibc
+  - compiler: functional but incomplete (lacking most atomic rmw operations)
+  - libgcc: compiles (untested)
+  - libstdc++: blocked on glibc
 - linux kernel: functional but incomplete (lacking mouse driver and smp support)
 
 ## Building

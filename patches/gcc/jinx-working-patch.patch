@@ -189,7 +189,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/predicates.md gcc-workdi
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032-protos.h gcc-workdir/gcc/config/xr17032/xr17032-protos.h
 --- gcc-clean/gcc/config/xr17032/xr17032-protos.h	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032-protos.h
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,45 @@
 +/* Prototypes for xr17032.cc functions used in the md file & elsewhere.
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +
@@ -218,10 +218,16 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032-protos.h gcc-wor
 +  XR17032_SYMBOL_PCREL,
 +};
 +
++enum xr17032_epilogue_style
++{
++  XR17032_EPILOGUE_NORMAL,
++  XR17032_EPILOGUE_EH_RETURN,
++};
++
 +extern int xr17032_regno_ok_for_base_p (int, bool);
 +extern poly_int64 xr17032_initial_elimination_offset (int, int);
 +extern void xr17032_expand_prologue (void);
-+extern void xr17032_expand_epilogue (void);
++extern void xr17032_expand_epilogue (enum xr17032_epilogue_style style);
 +extern rtx xr17032_return_addr (int);
 +extern void xr17032_init_cumulative_args (CUMULATIVE_ARGS *, tree, rtx, tree,
 +					  int);
@@ -232,7 +238,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032-protos.h gcc-wor
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/gcc/config/xr17032/xr17032.cc
 --- gcc-clean/gcc/config/xr17032/xr17032.cc	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.cc
-@@ -0,0 +1,1286 @@
+@@ -0,0 +1,1310 @@
 +/* Target Code for XR/17032
 +   Copyright (C) 2025-2025 Free Softwa*re Foundation, Inc.
 +   Contributed by monkuous.
@@ -722,12 +728,30 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +  return INVALID_REGNUM;
 +}
 +
++static bool
++xr17032_is_eh_return_data_register (unsigned int regno)
++{
++  unsigned int i, regnum;
++
++  if (!crtl->calls_eh_return)
++    return false;
++
++  for (i = 0; (regnum = EH_RETURN_DATA_REGNO (i)) != INVALID_REGNUM; i++)
++    if (regno == regnum)
++      {
++	return true;
++      }
++
++  return false;
++}
++
 +/* Call FN for each register that is saved by the current function.
 +   SP_OFFSET is the offset of the current stack pointer from the start
 +   of the frame.  */
 +
 +static void
-+xr17032_for_each_saved_reg (poly_int64 sp_offset, xr17032_save_restore_fn fn)
++xr17032_for_each_saved_reg (poly_int64 sp_offset, xr17032_save_restore_fn fn,
++			    bool epilogue, bool maybe_eh_return)
 +{
 +  HOST_WIDE_INT offset;
 +  unsigned int regno;
@@ -742,6 +766,10 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +       regno = xr17032_next_saved_reg (regno, limit, &offset))
 +    {
 +      if (cfun->machine->reg_is_wrapped_separately[regno])
++	continue;
++
++      if (epilogue && !maybe_eh_return
++	  && xr17032_is_eh_return_data_register (regno))
 +	continue;
 +
 +      xr17032_save_restore_reg (word_mode, regno, offset, fn);
@@ -901,7 +929,8 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +				GEN_INT (step1));
 +	  RTX_FRAME_RELATED_P (emit_insn (insn)) = 1;
 +	}
-+      xr17032_for_each_saved_reg (remaining_size, xr17032_save_reg);
++      xr17032_for_each_saved_reg (remaining_size, xr17032_save_reg,
++				  false, false);
 +    }
 +
 +  /* Set up the frame pointer, if we're using one.  */
@@ -951,7 +980,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +}
 +
 +void
-+xr17032_expand_epilogue (void)
++xr17032_expand_epilogue (enum xr17032_epilogue_style style)
 +{
 +  /* Split the frame into 2 steps. STEP1 is the amount of stack we should
 +     deallocate before restoring the registers. STEP2 is the amount we
@@ -970,7 +999,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +  if (cfun->machine->naked_p)
 +    return;
 +
-+  if (xr17032_can_use_return_insn ())
++  if (style == XR17032_EPILOGUE_NORMAL && xr17032_can_use_return_insn ())
 +    {
 +      emit_jump_insn (gen_xr17032_return ());
 +      return;
@@ -1092,7 +1121,8 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +    }
 +
 +  /* Restore the registers.  */
-+  xr17032_for_each_saved_reg (frame->total_size - step2, xr17032_restore_reg);
++  xr17032_for_each_saved_reg (frame->total_size - step2, xr17032_restore_reg,
++			      true, style == XR17032_EPILOGUE_EH_RETURN);
 +
 +  if (need_barrier_p)
 +    xr17032_emit_stack_tie (hard_frame_pointer_rtx);
@@ -1522,7 +1552,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gcc/config/xr17032/xr17032.h
 --- gcc-clean/gcc/config/xr17032/xr17032.h	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.h
-@@ -0,0 +1,261 @@
+@@ -0,0 +1,272 @@
 +/* Target Definitions for XR/17032.
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +   Contributed by monkuous.
@@ -1730,6 +1760,8 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gc
 +#define ACCUMULATE_OUTGOING_ARGS 1
 +#define RETURN_ADDR_RTX(COUNT, FRAMEADDR) xr17032_return_addr (COUNT)
 +#define INCOMING_RETURN_ADDR_RTX gen_rtx_REG (VOIDmode, XR17032_LR)
++#define DWARF_FRAME_RETURN_COLUMN XR17032_LR
++#define DWARF_ALT_FRAME_RETURN_COLUMN 38
 +#define MAX_ARGS_IN_REGISTERS 4
 +#define DEFAULT_PCC_STRUCT_RETURN 0
 +
@@ -1783,11 +1815,20 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gc
 +      (MODE) = word_mode;                       \
 +    }
 +
++#define WORD_REGISTER_OPERATIONS 1
++
++/* Describe how we implement __builtin_eh_return.  */
++#define EH_RETURN_DATA_REGNO(N) \
++  ((N) < 4 ? (N) + XR17032_T0 : INVALID_REGNUM)
++
++#define ASM_PREFERRED_EH_DATA_FORMAT(CODE,GLOBAL) \
++  (((GLOBAL) ? DW_EH_PE_indirect : 0) | DW_EH_PE_pcrel | DW_EH_PE_sdata4)
++
 +#endif /* GCC_XR17032_H */
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/gcc/config/xr17032/xr17032.md
 --- gcc-clean/gcc/config/xr17032/xr17032.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.md
-@@ -0,0 +1,744 @@
+@@ -0,0 +1,769 @@
 +;; Machine description for XR/17032
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -1838,7 +1879,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +  [(const_int 2)]
 +  ""
 +{
-+  xr17032_expand_epilogue ();
++  xr17032_expand_epilogue (XR17032_EPILOGUE_NORMAL);
 +  DONE;
 +})
 +
@@ -1857,6 +1898,34 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +  ""
 +  [(set_attr "length" "0")]
 +)
++
++;; This is used in compiling the unwind routines.
++(define_expand "eh_return"
++  [(use (match_operand 0 "general_operand"))]
++  ""
++{
++  if (GET_MODE (operands[0]) != word_mode)
++    operands[0] = convert_to_mode (word_mode, operands[0], 0);
++
++  emit_insn (gen_eh_set_lr_si (operands[0]));
++  emit_jump_insn (gen_eh_return_internal ());
++  emit_barrier ();
++  DONE;
++})
++
++(define_insn "eh_set_lr_si"
++  [(match_operand:SI 0 "register_operand" "r")
++   (clobber (match_scratch:SI 1 "=&r"))]
++  ""
++  "#")
++
++(define_insn_and_split "eh_return_internal"
++  [(eh_return)]
++  ""
++  "#"
++  "epilogue_completed"
++  [(const_int 0)]
++  "xr17032_expand_epilogue (XR17032_EPILOGUE_EH_RETURN); DONE;")
 +
 +;; -------------------------------------------------------------------------
 +;; nop instruction
@@ -2188,7 +2257,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +  "@
 +   jalr\tlr,%0,0
 +   jal\t%0
-+   adr\tlr,%0\;jalr\tlr,lr,%%pcrel(%0+4)"
++   1:\;adr\tlr,%%pcrel_hi(%0)\;jalr\tlr,lr,%%pcrel_lo(1b)"
 +  [(set (attr "length")
 +	(symbol_ref "xr17032_pcrel_symbolic_operand (operands[1], VOIDmode) ? 8
 +		     : 4"))])
@@ -2215,7 +2284,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +  "@
 +   jalr\tlr,%1,0
 +   jal\t%1
-+   adr\tlr,%1\;jalr\tlr,lr,%%pcrel(%1+4)"
++   1:\;adr\tlr,%%pcrel_hi(%1)\;jalr\tlr,lr,%%pcrel_lo(1b)"
 +  [(set (attr "length")
 +	(symbol_ref "xr17032_pcrel_symbolic_operand (operands[1], VOIDmode) ? 8
 +		     : 4"))])
@@ -2463,10 +2532,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.md gcc-workdir/g
 +    }
 +
 +  emit_insn (gen_rtx_SET (operands[0],
-+			  gen_rtx_IF_THEN_ELSE (SImode,
-+						gen_rtx_LTU (SImode, compare,
-+							     const1_rtx),
-+						const1_rtx, const0_rtx)));
++			  gen_rtx_LTU (SImode, compare, const1_rtx)));
 +  DONE;
 +})
 +
