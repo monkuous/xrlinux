@@ -10,12 +10,12 @@ imagedeps="build-essential bc"
 
 configure() {
     cp -pr "${source_dir}/." .
-    make ARCH="${JINX_ARCH}" CROSS_COMPILE="${TRIPLE}-" -j"${parallelism}" mrproper
-    make ARCH="${JINX_ARCH}" CROSS_COMPILE="${TRIPLE}-" -j"${parallelism}" defconfig
+    make -j"${parallelism}" ARCH="${JINX_ARCH}" CROSS_COMPILE="${TRIPLE}-" mrproper
+    make -j"${parallelism}" ARCH="${JINX_ARCH}" CROSS_COMPILE="${TRIPLE}-" defconfig
 }
 
 build() {
-    make ARCH="${JINX_ARCH}" CROSS_COMPILE="${TRIPLE}-" -j"${parallelism}"
+    make -j"${parallelism}" ARCH="${JINX_ARCH}" CROSS_COMPILE="${TRIPLE}-"
 }
 
 package() {
