@@ -6191,7 +6191,7 @@ diff -urN --no-dereference binutils-clean/include/opcode/xr17032.h binutils-work
 +#define XR_IMM_VALID_I_S(x) (XR_IMM_EXTRACT_I_S(XR_IMM_ENCODE_I_S(x)) == (x))
 +#define XR_IMM_VALID_R(x) (XR_IMM_EXTRACT_R(XR_IMM_ENCODE_R(x)) == (x))
 +
-+#define XR_IMM_HIGH_PART(x) ((x) & ~(__typeof__(x))0xffff)
++#define XR_IMM_HIGH_PART(x) ((x) & 0xffff0000)
 +#define XR_IMM_LOW_PART(x) ((x) & 0xffff)
 +
 +#define XR_OPCODE_J_JAL	7
