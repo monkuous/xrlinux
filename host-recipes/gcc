@@ -1,0 +1,26 @@
+#! /bin/sh
+
+name=gcc
+from_source=gcc
+revision=1
+hostdeps="binutils"
+imagedeps="build-essential libgmp-dev libmpc-dev libmpfr-dev"
+deps="glibc"
+
+configure() {
+    "${source_dir}"/configure               \
+            --prefix="${prefix}"            \
+            --target="${TRIPLE}"            \
+            --with-sysroot="${sysroot_dir}" \
+            --disable-nls                   \
+            --enable-languages=c,c++        \
+            --enable-default-pie
+}
+
+build() {
+    make -j"${parallelism}"
+}
+
+package() {
+    make -j"${parallelism}" DESTDIR="${dest_dir}" install
+}
