@@ -2305,7 +2305,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/uapi/asm/ucontext.h 
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/Makefile linux-workdir/arch/xr17032/kernel/Makefile
 --- linux-clean/arch/xr17032/kernel/Makefile	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/Makefile
-@@ -0,0 +1,20 @@
+@@ -0,0 +1,19 @@
 +# SPDX-License-Identifier: GPL-2.0-only
 +#
 +# Makefile for the XR/17032 Linux kernel
@@ -2324,7 +2324,6 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/Makefile linux-workdi
 +obj-y	+= syscall_table.o
 +obj-y	+= time.o
 +
-+obj-y	+= asm-stubs.o
 +obj-y	+= stubs.o
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/asm-offsets.c linux-workdir/arch/xr17032/kernel/asm-offsets.c
 --- linux-clean/arch/xr17032/kernel/asm-offsets.c	1970-01-01 01:00:00.000000000 +0100
@@ -2398,22 +2397,6 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/asm-offsets.c linux-w
 +	OFFSET(TASK_THREAD_SP, task_struct, thread.sp);
 +	OFFSET(TASK_THREAD_LR, task_struct, thread.lr);
 +}
-diff -urN --no-dereference linux-clean/arch/xr17032/kernel/asm-stubs.S linux-workdir/arch/xr17032/kernel/asm-stubs.S
---- linux-clean/arch/xr17032/kernel/asm-stubs.S	1970-01-01 01:00:00.000000000 +0100
-+++ linux-workdir/arch/xr17032/kernel/asm-stubs.S
-@@ -0,0 +1,12 @@
-+/* SPDX-License-Identifier: GPL-2.0-only */
-+/*
-+ * Copyright (C) 2025 monkuous
-+ */
-+
-+#include <linux/linkage.h>
-+
-+.text
-+
-+SYM_FUNC_START(__clear_user)
-+	brk
-+SYM_FUNC_END(__clear_user)
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/context.c linux-workdir/arch/xr17032/kernel/context.c
 --- linux-clean/arch/xr17032/kernel/context.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/context.c
@@ -3722,7 +3705,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/signal.c linux-workdi
 diff -urN --no-dereference linux-clean/arch/xr17032/kernel/stubs.c linux-workdir/arch/xr17032/kernel/stubs.c
 --- linux-clean/arch/xr17032/kernel/stubs.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/kernel/stubs.c
-@@ -0,0 +1,73 @@
+@@ -0,0 +1,57 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -3749,22 +3732,6 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/stubs.c linux-workdir
 +		 unsigned long addr, unsigned long data)
 +{
 +	panic("TODO arch_ptrace");
-+}
-+
-+void flush_tlb_kernel_range(unsigned long start, unsigned long end)
-+{
-+	panic("TODO flush_tlb_kernel_range");
-+}
-+
-+void flush_tlb_mm_range(struct mm_struct *mm, unsigned long start,
-+			unsigned long end, unsigned int page_size)
-+{
-+	panic("TODO flush_tlb_mm_range");
-+}
-+
-+void flush_tlb_page(struct vm_area_struct *vma, unsigned long addr)
-+{
-+	panic("TODO flush_tlb_page");
 +}
 +
 +unsigned long __get_wchan(struct task_struct *task)
@@ -4061,7 +4028,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/lib/delay.c linux-workdir/ar
 diff -urN --no-dereference linux-clean/arch/xr17032/lib/uaccess.S linux-workdir/arch/xr17032/lib/uaccess.S
 --- linux-clean/arch/xr17032/lib/uaccess.S	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/lib/uaccess.S
-@@ -0,0 +1,33 @@
+@@ -0,0 +1,80 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -4095,6 +4062,53 @@ diff -urN --no-dereference linux-clean/arch/xr17032/lib/uaccess.S linux-workdir/
 +	jalr	zero, lr, 0
 +SYM_FUNC_END(__asm_copy_to_user)
 +SYM_FUNC_ALIAS(__asm_copy_from_user, __asm_copy_to_user)
++
++SYM_FUNC_START(__clear_user)
++	lui t2, zero, 0xffff0000
++	ori t2, t2, 0xffff
++
++	add a3, a0, a1
++	addi t0, a0, 3
++	and t1, a3, t2
++	and t0, t0, t2
++	/*
++	 * a3: terminal address of target region
++	 * t0: lowest word-aligned address in target region
++	 * t1: highest word-aligned address in target region
++	 */
++	slt t2, t0, t1
++	beq t2, 2f
++	slt t2, a0, t0
++	bne t2, 4f
++
++1:	fixup long [a0], zero, 11f
++	addi a0, a0, 4
++	slt t2, a0, t1
++	bne t2, 1b
++
++2:	slt t2, a0, a3
++	bne t2, 5f
++
++3:	addi zero, zero, 0
++	jalr zero, lr, 0
++
++4:	/* Edge case: not aligned */
++	fixup byte [a0], zero, 11f
++	addi a0, a0, 1
++	slt t2, a0, t0
++	bne t2, 4b
++	beq zero, 1b
++5:	/* Edge case: remainder */
++	fixup byte [a0], zero, 11f
++	addi a0, a0, 1
++	slt t2, a0, t3
++	bne t2, 5b
++	beq zero, 3b
++
++11:	/* Exception fixup code */
++	sub a3, a3, a0
++	jalr zero, lr, 0
++SYM_FUNC_END(__clear_user)
 diff -urN --no-dereference linux-clean/arch/xr17032/mm/Makefile linux-workdir/arch/xr17032/mm/Makefile
 --- linux-clean/arch/xr17032/mm/Makefile	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/mm/Makefile
@@ -4874,7 +4888,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/mm/init.c linux-workdir/arch
 diff -urN --no-dereference linux-clean/arch/xr17032/mm/tlbflush.c linux-workdir/arch/xr17032/mm/tlbflush.c
 --- linux-clean/arch/xr17032/mm/tlbflush.c	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/mm/tlbflush.c
-@@ -0,0 +1,76 @@
+@@ -0,0 +1,93 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -4950,6 +4964,23 @@ diff -urN --no-dereference linux-clean/arch/xr17032/mm/tlbflush.c linux-workdir/
 +void flush_tlb_mm(struct mm_struct *mm)
 +{
 +	__flush_tlb_range(mm, mm_cpumask(mm), 0, FLUSH_TLB_MAX_SIZE);
++}
++
++
++void flush_tlb_page(struct vm_area_struct *vma, unsigned long addr)
++{
++	__flush_tlb_range(vma->vm_mm, mm_cpumask(vma->vm_mm), addr, PAGE_SIZE);
++}
++
++void flush_tlb_mm_range(struct mm_struct *mm, unsigned long start,
++			unsigned long end, unsigned int page_size)
++{
++	__flush_tlb_range(mm, mm_cpumask(mm), start, end - start);
++}
++
++void flush_tlb_kernel_range(unsigned long start, unsigned long end)
++{
++	__flush_tlb_range(NULL, cpu_online_mask, start, end - start);
 +}
 diff -urN --no-dereference linux-clean/drivers/Kconfig linux-workdir/drivers/Kconfig
 --- linux-clean/drivers/Kconfig
