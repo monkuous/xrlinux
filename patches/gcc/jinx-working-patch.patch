@@ -305,7 +305,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/predicates.md gcc-workdi
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/sync.md gcc-workdir/gcc/config/xr17032/sync.md
 --- gcc-clean/gcc/config/xr17032/sync.md	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/sync.md
-@@ -0,0 +1,631 @@
+@@ -0,0 +1,626 @@
 +;; Machine description for XR/17032 atomic operations
 +;; Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +;; Contributed by monkuous
@@ -548,8 +548,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/sync.md gcc-workdir/gcc/
 +						   not_mask));
 +  emit_insn (gen_mem_thread_fence (model));
 +
-+  emit_move_insn (old, gen_rtx_ASHIFTRT (SImode, old,
-+					 gen_lowpart (QImode, shift)));
++  emit_move_insn (old, gen_rtx_ASHIFTRT (SImode, old, shift));
 +
 +  emit_move_insn (operands[0], gen_lowpart (<MODE>mode, old));
 +
@@ -613,8 +612,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/sync.md gcc-workdir/gcc/
 +							     mask, not_mask));
 +  emit_insn (gen_mem_thread_fence (model));
 +
-+  emit_move_insn (old, gen_rtx_ASHIFTRT (SImode, old,
-+					 gen_lowpart (QImode, shift)));
++  emit_move_insn (old, gen_rtx_ASHIFTRT (SImode, old, shift));
 +
 +  emit_move_insn (operands[0], gen_lowpart (<MODE>mode, old));
 +
@@ -682,8 +680,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/sync.md gcc-workdir/gcc/
 +						 shifted_value, not_mask));
 +  emit_insn (gen_mem_thread_fence (model));
 +
-+  emit_move_insn (old, gen_rtx_ASHIFTRT (SImode, old,
-+					 gen_lowpart (QImode, shift)));
++  emit_move_insn (old, gen_rtx_ASHIFTRT (SImode, old, shift));
 +
 +  emit_move_insn (operands[0], gen_lowpart (<MODE>mode, old));
 +  DONE;
@@ -868,8 +865,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/sync.md gcc-workdir/gcc/
 +					    mask, not_mask));
 +  emit_insn (gen_mem_thread_fence (model));
 +
-+  emit_move_insn (old, gen_rtx_ASHIFTRT (SImode, old,
-+					 gen_lowpart (QImode, shift)));
++  emit_move_insn (old, gen_rtx_ASHIFTRT (SImode, old, shift));
 +
 +  emit_move_insn (operands[0], gen_lowpart (<MODE>mode, old));
 +
@@ -930,8 +926,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/sync.md gcc-workdir/gcc/
 +  emit_insn (gen_atomic_fetch_orsi_internal (old, aligned_mem, shifted_set));
 +  emit_insn (gen_mem_thread_fence (model));
 +
-+  emit_move_insn (old, gen_rtx_ASHIFTRT (SImode, old,
-+					 gen_lowpart (QImode, shift)));
++  emit_move_insn (old, gen_rtx_ASHIFTRT (SImode, old, shift));
 +
 +  emit_move_insn (operands[0], gen_lowpart (QImode, old));
 +
@@ -1004,7 +999,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032-protos.h gcc-wor
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/gcc/config/xr17032/xr17032.cc
 --- gcc-clean/gcc/config/xr17032/xr17032.cc	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.cc
-@@ -0,0 +1,2362 @@
+@@ -0,0 +1,2360 @@
 +/* Target Code for XR/17032
 +   Copyright (C) 2025-2025 Free Softwa*re Foundation, Inc.
 +   Contributed by monkuous.
@@ -3190,17 +3185,17 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +  /* Align the memory address to a word.  */
 +  rtx addr = force_reg (Pmode, XEXP (mem, 0));
 +
-+  rtx addr_mask = gen_int_mode (-4, Pmode);
++  rtx addr_offset = gen_reg_rtx (Pmode);
++  emit_move_insn (addr_offset, gen_rtx_AND (Pmode, addr,
++                                            gen_int_mode (3, SImode)));
 +
 +  rtx aligned_addr = gen_reg_rtx (Pmode);
-+  emit_move_insn (aligned_addr,  gen_rtx_AND (Pmode, addr, addr_mask));
++  emit_move_insn (aligned_addr, gen_rtx_MINUS (Pmode, addr, addr_offset));
 +
 +  *aligned_mem = change_address (mem, SImode, aligned_addr);
 +
 +  /* Calculate the shift amount.  */
-+  emit_move_insn (*shift, gen_rtx_AND (SImode, gen_lowpart (SImode, addr),
-+				       gen_int_mode (3, SImode)));
-+  emit_move_insn (*shift, gen_rtx_ASHIFT (SImode, *shift,
++  emit_move_insn (*shift, gen_rtx_ASHIFT (SImode, addr_offset,
 +					  gen_int_mode (3, SImode)));
 +
 +  /* Calculate the mask.  */
@@ -3208,8 +3203,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +
 +  emit_move_insn (*mask, gen_int_mode (unshifted_mask, SImode));
 +
-+  emit_move_insn (*mask, gen_rtx_ASHIFT (SImode, *mask,
-+					 gen_lowpart (QImode, *shift)));
++  emit_move_insn (*mask, gen_rtx_ASHIFT (SImode, *mask, *shift));
 +
 +  emit_move_insn (*not_mask, gen_rtx_NOT (SImode, *mask));
 +}
@@ -3222,8 +3216,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +{
 +  rtx value_reg = gen_reg_rtx (SImode);
 +  emit_move_insn (value_reg, gen_lowpart (SImode, value));
-+  emit_move_insn (*shifted_value, gen_rtx_ASHIFT (SImode, value_reg,
-+						  gen_lowpart (QImode, shift)));
++  emit_move_insn (*shifted_value, gen_rtx_ASHIFT (SImode, value_reg, shift));
 +}
 +
 +/* Return the number of instructions needed to load constant X.
