@@ -999,7 +999,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032-protos.h gcc-wor
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/gcc/config/xr17032/xr17032.cc
 --- gcc-clean/gcc/config/xr17032/xr17032.cc	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.cc
-@@ -0,0 +1,2360 @@
+@@ -0,0 +1,2361 @@
 +/* Target Code for XR/17032
 +   Copyright (C) 2025-2025 Free Softwa*re Foundation, Inc.
 +   Contributed by monkuous.
@@ -1359,11 +1359,12 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +
 +  /* At the bottom of the frame are any outgoing stack arguments. */
 +  offset = xr17032_stack_align (crtl->outgoing_args_size);
-+  /* The frame pointer points to the local variables. */
++  /* The hard frame pointer points to the local variables. */
 +  frame->hard_frame_pointer_offset = offset;
-+  frame->frame_pointer_offset = offset;
 +  /* Next are local stack variables. */
 +  offset += xr17032_stack_align (get_frame_size ());
++  /* The virtual frame pointer points to the callee-saved GPRs. */
++  frame->frame_pointer_offset = offset;
 +  /* Next are the callee-saved GPRs. */
 +  if (frame->mask)
 +    {
