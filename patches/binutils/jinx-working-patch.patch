@@ -3620,7 +3620,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +  entry[2] = XR_INSN_I_2   (LL,   T3, T2, gotplt_offset_low);
 +  entry[3] = XR_INSN_I     (SUBI, T1, T1, PLT_HEADER_SIZE + 12);
 +  entry[4] = XR_INSN_R     (ADD,  T1, ZERO, T1, RSH, 2);
-+  entry[5] = XR_INSN_I_2   (LL,   T0, T0, gotplt_offset_low + 4);
++  entry[5] = XR_INSN_I_2   (LL,   T0, T2, gotplt_offset_low + 4);
 +  entry[6] = XR_INSN_I_2   (JALR, ZERO, T3, 0);
 +
 +  return true;
