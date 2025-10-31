@@ -2756,7 +2756,6 @@ diff -urN --no-dereference glibc-clean/sysdeps/xr17032/start.S glibc-workdir/sys
 +	   .cfi_label to force starting the FDE.  */
 +	.cfi_label .Ldummy
 +	cfi_undefined (lr)
-+	mov   a2, long [sp + 4] /* argv.  */
 +	mov   long [sp + 4], a0 /* rtld_fini. */
 +	/* main may be in a shared library.  */
 +#if defined PIC && !defined SHARED
@@ -2769,6 +2768,7 @@ diff -urN --no-dereference glibc-clean/sysdeps/xr17032/start.S glibc-workdir/sys
 +	mov   a0, long [a0 + %pcrel_lo(1b)]
 +#endif
 +	mov   a1, long [sp]     /* argc.  */
++	addi  a2, sp, 4         /* argv.  */
 +	addi  a3, zero, 0       /* Used to be init.  */
 +	mov   long [sp], zero   /* Used to be fini.  */
 +	mov   long [sp + 8], sp /* stack_end. */
