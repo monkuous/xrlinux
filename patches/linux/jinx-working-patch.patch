@@ -4352,7 +4352,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/lib/uaccess.S linux-workdir/
 +2:	slt t2, a0, a3
 +	bne t2, 5f
 +
-+3:	addi zero, zero, 0
++3:	addi a3, zero, 0
 +	jalr zero, lr, 0
 +
 +4:	/* Edge case: not aligned */
