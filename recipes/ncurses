@@ -1,0 +1,48 @@
+#! /bin/sh
+
+name=ncurses
+_snapshot=20250830
+version=6.5.${_snapshot}
+tarball_url="https://github.com/ThomasDickey/ncurses-snapshots/archive/refs/tags/v6_5_${_snapshot}.tar.gz"
+tarball_blake2b="6e385f89805931a3f8437116b08e775da2925424a27df00abc2d9e90402bab22699c7c00db3fdca071e147a8d9d120d6122f4776ad393637f026bc3ddffc859d"
+revision=1
+source_hostdeps="autoconf"
+hostdeps="gcc pkg-config"
+imagedeps="build-essential"
+deps="core-libs"
+
+prepare() {
+    cp -p /usr/local/share/autoconf/build-aux/config.sub .
+}
+
+configure() {
+    autotools_configure                                     \
+        --enable-widec                                      \
+        --enable-pc-files                                   \
+        --with-shared                                       \
+        --with-cxx-shared                                   \
+        --with-cxx-binding                                  \
+        --without-normal                                    \
+        --without-debug                                     \
+        --with-pkg-config-libdir="${prefix}/lib/pkgconfig"  \
+        --with-termlib                                      \
+        --without-ada
+}
+
+build() {
+    make -j"${parallelism}"
+}
+
+package() {
+    make -j"${parallelism}" DESTDIR="${dest_dir}" install
+
+    for lib in ncurses ncurses++ form panel menu tinfo; do
+        echo "INPUT(-l${lib}w)" > "${dest_dir}${prefix}/lib/lib${lib}.so"
+        ln -sf "${lib}w.pc" "${dest_dir}${prefix}/lib/pkgconfig/${lib}.pc"
+    done
+
+    echo "INPUT(-lncursesw)" > "${dest_dir}${prefix}/lib/libcurses.so"
+    echo "INPUT(-lncursesw)" > "${dest_dir}${prefix}/lib/libcursesw.so"
+
+    rm -f "${dest_dir}${prefix}/lib"/*.a
+}
