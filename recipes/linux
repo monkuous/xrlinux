@@ -5,7 +5,7 @@ version=6.16.4
 tarball_url="https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.16.4.tar.xz"
 tarball_blake2b="251feef2f995c155850eac2fce5b89f37f39e9f13b6a4e6873370fdc69654692c6bf6c92f04ca7c0b5fd6088d74442afb68db71d2cc18691e23c61b0be714f34"
 revision=1
-hostdeps="binutils gcc-bootstrap"
+hostdeps="gcc-bootstrap"
 imagedeps="build-essential bc"
 
 configure() {

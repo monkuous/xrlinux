@@ -9,6 +9,14 @@ autotools_regen() {
             | sort -z | xargs -0 autoreconf -fvi "$@"
 }
 
+autotools_configure() {
+    "${source_dir}/configure"                   \
+        --host="${TRIPLE}"                      \
+        --prefix="${prefix}"                    \
+        --with-strip-program="${TRIPLE}-strip"  \
+        "$@"
+}
+
 cmake_configure() {
     cmake "${source_dir}"                                                                   \
         -GNinja                                                                             \

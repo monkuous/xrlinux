@@ -1,6 +1,7 @@
 #! /bin/sh
 
-name=install-apt
+name=core-libs
 version=0
+revision=1
 skip_pkg_check=yes
-source_dir=install-apt
+deps="glibc"

@@ -4,7 +4,7 @@ name=init
 version=0
 revision=1
 skip_pkg_check=yes
-hostdeps="binutils gcc-bootstrap"
+hostdeps="gcc-bootstrap"
 imagedeps="build-essential"
 
 build() {

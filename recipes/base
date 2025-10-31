@@ -4,4 +4,4 @@ name=base
 version=0
 revision=1
 skip_pkg_check=yes
-deps="base-files glibc init linux"
+deps="base-files core-libs init linux"
