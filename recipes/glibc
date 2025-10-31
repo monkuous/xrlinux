@@ -15,9 +15,14 @@ prepare() {
 }
 
 configure() {
-    autotools_configure \
-        --disable-nscd  \
-        --enable-kernel=6.16
+    cat > configparms << EOF
+rootsbindir=${prefix}/bin
+sbindir=${prefix}/bin
+EOF
+    autotools_configure                     \
+        --disable-nscd                      \
+        --enable-kernel=6.16                \
+        libc_cv_slibdir="${prefix}/lib"
 }
 
 build() {

@@ -25,6 +25,7 @@ configure() {
         --without-normal                                    \
         --without-debug                                     \
         --with-pkg-config-libdir="${prefix}/lib/pkgconfig"  \
+        --with-strip-program="${TRIPLE}-strip"              \
         --with-termlib                                      \
         --without-ada
 }
