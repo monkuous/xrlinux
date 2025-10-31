@@ -45,4 +45,6 @@ package() {
     make "-j${parallelism}" DESTDIR="${dest_dir}" install
 
     install -Dm644 "${base_dir}"/build-support/readline/inputrc "${dest_dir}"/etc/inputrc
+
+    post_package_strip
 }

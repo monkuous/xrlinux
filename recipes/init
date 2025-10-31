@@ -60,4 +60,6 @@ EOF
 
 package() {
     install -Dm755 init "${dest_dir}/usr/bin/init"
+
+    post_package_strip
 }

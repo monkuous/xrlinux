@@ -25,4 +25,6 @@ package() {
 KernelPath: /boot/linux-${version}
 StdoutPath: serial1
 EOF
+
+    post_package_strip
 }

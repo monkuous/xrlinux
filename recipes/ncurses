@@ -46,4 +46,6 @@ package() {
     echo "INPUT(-lncursesw)" > "${dest_dir}${prefix}/lib/libcursesw.so"
 
     rm -f "${dest_dir}${prefix}/lib"/*.a
+
+    post_package_strip
 }

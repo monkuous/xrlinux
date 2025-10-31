@@ -31,4 +31,6 @@ build() {
 
 package() {
     make -j"${parallelism}" DESTDIR="${dest_dir}" install
+
+    post_package_strip
 }
