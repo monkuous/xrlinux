@@ -1,0 +1,31 @@
+#! /bin/sh
+
+name=glibc
+version=2.42
+tarball_url="https://ftpmirror.gnu.org/glibc/glibc-2.42.tar.xz"
+tarball_blake2b="6ffabfe7942034a5a4fb5097679cb47bc3431eb2a3864af07cea0cb6aa5db63fbaf6f026b3c9299e00268058a6762eb21e92499f012d552ed87d65c7ffbd0bbe"
+revision=1
+source_hostdeps="autoconf"
+hostdeps="binutils gcc-bootstrap"
+imagedeps="build-essential"
+deps="linux-headers"
+
+prepare() {
+    cp -p /usr/local/share/autoconf/build-aux/config.sub scripts
+}
+
+configure() {
+    "${source_dir}/configure"   \
+        --prefix="${prefix}"    \
+        --host="${TRIPLE}"      \
+        --disable-nscd          \
+        --enable-kernel=6.16
+}
+
+build() {
+    make -j"${parallelism}"
+}
+
+package() {
+    make -j"${parallelism}" DESTDIR="${dest_dir}" install
+}
