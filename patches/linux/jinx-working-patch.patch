@@ -2187,26 +2187,6 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/uapi/asm/elf.h linux
 +typedef unsigned int elf_fpregset_t;
 +
 +#endif /* _UAPI_ASM_XR17032_ELF_H */
-diff -urN --no-dereference linux-clean/arch/xr17032/include/uapi/asm/posix_types.h linux-workdir/arch/xr17032/include/uapi/asm/posix_types.h
---- linux-clean/arch/xr17032/include/uapi/asm/posix_types.h	1970-01-01 01:00:00.000000000 +0100
-+++ linux-workdir/arch/xr17032/include/uapi/asm/posix_types.h
-@@ -0,0 +1,16 @@
-+/* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
-+/*
-+ * Copyright (C) 2025 monkuous
-+ */
-+
-+#ifndef _UAPI_ASM_XR17032_POSIX_TYPES_H
-+#define _UAPI_ASM_XR17032_POSIX_TYPES_H
-+
-+typedef unsigned long	__kernel_size_t;
-+typedef long		__kernel_ssize_t;
-+typedef long		__kernel_ptrdiff_t;
-+#define __kernel_size_t __kernel_size_t
-+
-+#include <asm-generic/posix_types.h>
-+
-+#endif /* _UAPI_ASM_XR17032_POSIX_TYPES_H */
 diff -urN --no-dereference linux-clean/arch/xr17032/include/uapi/asm/ptrace.h linux-workdir/arch/xr17032/include/uapi/asm/ptrace.h
 --- linux-clean/arch/xr17032/include/uapi/asm/ptrace.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/uapi/asm/ptrace.h

@@ -235,7 +235,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf-bfd.h binutils-workdir/bfd/elf
 diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/bfd/elf32-xr17032.c
 --- binutils-clean/bfd/elf32-xr17032.c	1970-01-01 01:00:00.000000000 +0100
 +++ binutils-workdir/bfd/elf32-xr17032.c
-@@ -0,0 +1,4040 @@
+@@ -0,0 +1,4051 @@
 +/* BFD back-end for XR/17032 ELF
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +   Written by monkuous.
@@ -1884,7 +1884,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +		  || (ELF_ST_VISIBILITY (h->other) != STV_DEFAULT
 +		      && h->root.type == bfd_link_hash_undefweak))))
 +	{
-+	  /* This case can occur if we saw a R_XR17032_JUMP_PLT reloc in an
++	  /* This case can occur if we saw a R_XR17032_JUMP reloc in an
 +	     input file, but the symbol was never referred to by a dynamic
 +	     object, or if all references were garbage collected.  In such
 +	     a case, we don't actually need to build a PLT entry.  */
@@ -2555,6 +2555,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +    case R_XR17032_HI16:
 +    case R_XR17032_HI16_PCREL:
 +    case R_XR17032_HI16_GOT:
++    case R_XR17032_HI16_PLT:
 +    case R_XR17032_HI16_TLS_GOT:
 +    case R_XR17032_HI16_TLS_GD:
 +    case R_XR17032_HI16_TPREL:
@@ -2710,8 +2711,9 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	 so the corresponding %pcrel_lo with addend looks wrong.  */
 +      char *string = NULL;
 +      if (entry == NULL)
-+	string = _("%pcrel_lo missing matching %pcrel_hi");
-+      else if (entry->type == R_XR17032_HI16_GOT
++	string = _("%%pcrel_lo missing matching %%pcrel_hi");
++      else if ((entry->type == R_XR17032_HI16_GOT
++		|| entry->type == R_XR17032_HI16_PLT)
 +	       && r->reloc->r_addend != 0)
 +	string = _("%pcrel_lo with addend isn't allowed for R_XR17032_HI16_GOT");
 +      else if (XR_IMM_HIGH_PART(entry->value)
@@ -3095,6 +3097,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +		goto do_relocation;
 +
 +	      case R_XR17032_HI16_PCREL:
++	      case R_XR17032_HI16_PLT:
 +		if (!xr17032_record_pcrel_hi_reloc (&pcrel_relocs, pc,
 +						    relocation, r_type))
 +		  r = bfd_reloc_overflow;
@@ -3246,6 +3249,7 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +	  break;
 +
 +	case R_XR17032_JUMP:
++	case R_XR17032_HI16_PLT:
 +	  /* Handle a jump to an undefined weak function.  This won't be
 +	     relaxed, so we have to handle it here.  */
 +	  if (h != NULL && h->root.type == bfd_link_hash_undefweak
@@ -3276,6 +3280,13 @@ diff -urN --no-dereference binutils-clean/bfd/elf32-xr17032.c binutils-workdir/b
 +		  r = bfd_reloc_notsupported;
 +		}
 +	    }
++
++	  if (r == bfd_reloc_ok && r_type == R_XR17032_HI16_PLT
++	      && !xr17032_record_pcrel_hi_reloc (&pcrel_relocs, pc,
++						 relocation
++						 + rel->r_addend,
++						 r_type))
++	    r = bfd_reloc_overflow;
 +	  break;
 +
 +	case R_XR17032_HI16_TPREL:
@@ -4494,7 +4505,7 @@ diff -urN --no-dereference binutils-clean/gas/Makefile.am binutils-workdir/gas/M
 diff -urN --no-dereference binutils-clean/gas/config/tc-xr17032.c binutils-workdir/gas/config/tc-xr17032.c
 --- binutils-clean/gas/config/tc-xr17032.c	1970-01-01 01:00:00.000000000 +0100
 +++ binutils-workdir/gas/config/tc-xr17032.c
-@@ -0,0 +1,1372 @@
+@@ -0,0 +1,1301 @@
 +/* tc-xr17032.c -- Assembler code for the XR/17032 CPU core.
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +
@@ -4835,51 +4846,6 @@ diff -urN --no-dereference binutils-clean/gas/config/tc-xr17032.c binutils-workd
 +{
 +}
 +
-+/* Because the value of .cfi_remember_state may changed after relaxation,
-+   we insert a fix to relocate it again in link-time.  */
-+
-+void
-+xr17032_pre_output_hook (void)
-+{
-+  const frchainS *frch;
-+  segT s;
-+
-+  /* Save the current segment info.  */
-+  segT seg = now_seg;
-+  subsegT subseg = now_subseg;
-+
-+  for (s = stdoutput->sections; s; s = s->next)
-+    for (frch = seg_info (s)->frchainP; frch; frch = frch->frch_next)
-+      {
-+	fragS *frag;
-+
-+	for (frag = frch->frch_root; frag; frag = frag->fr_next)
-+	  {
-+	    if (frag->fr_type == rs_cfa)
-+	      {
-+		expressionS exp;
-+		expressionS *symval;
-+
-+		symval = symbol_get_value_expression (frag->fr_symbol);
-+		exp.X_op = O_subtract;
-+		exp.X_add_symbol = symval->X_add_symbol;
-+		exp.X_add_number = 0;
-+		exp.X_op_symbol = symval->X_op_symbol;
-+
-+		/* We must set the segment before creating a frag after all
-+		   frag chains have been chained together.  */
-+		subseg_set (s, frch->frch_subseg);
-+
-+		fix_new_exp (frag, (int) frag->fr_offset, 1, &exp, 0,
-+			     BFD_RELOC_XR17032_CFA);
-+	      }
-+	  }
-+      }
-+
-+  /* Restore the original segment info.  */
-+  subseg_set (seg, subseg);
-+}
-+
 +int
 +md_estimate_size_before_relax (fragS *fragp ATTRIBUTE_UNUSED,
 +			       asection *segtype ATTRIBUTE_UNUSED)
@@ -4964,13 +4930,11 @@ diff -urN --no-dereference binutils-clean/gas/config/tc-xr17032.c binutils-workd
 +md_apply_fix (fixS *fixP, valueT *valP, segT seg)
 +{
 +  bfd_byte *buf = (bfd_byte *) (fixP->fx_frag->fr_literal + fixP->fx_where);
-+  segT sub_segment;
-+
-+  /* Remember value for tc_gen_reloc.  */
-+  fixP->fx_addnumber = *valP;
 +
 +  if (fixP->fx_pcrel)
 +    {
++      *valP += md_pcrel_from (fixP);
++
 +      switch (fixP->fx_r_type)
 +	{
 +	default:
@@ -4986,18 +4950,11 @@ diff -urN --no-dereference binutils-clean/gas/config/tc-xr17032.c binutils-workd
 +	case BFD_RELOC_32:
 +	  fixP->fx_r_type = BFD_RELOC_32_PCREL;
 +	  break;
-+	case BFD_RELOC_8_PCREL:
-+	case BFD_RELOC_16_PCREL:
-+	case BFD_RELOC_32_PCREL:
-+	case BFD_RELOC_XR17032_BRANCH:
-+	case BFD_RELOC_XR17032_HI16_PCREL:
-+	case BFD_RELOC_XR17032_HI16_GOT:
-+	case BFD_RELOC_XR17032_HI16_PLT:
-+	case BFD_RELOC_XR17032_HI16_TLS_GOT:
-+	case BFD_RELOC_XR17032_HI16_TLS_GD:
-+	  break;
 +	}
 +    }
++
++  /* Remember value for tc_gen_reloc.  */
++  fixP->fx_addnumber = *valP;
 +
 +  switch (fixP->fx_r_type)
 +    {
@@ -5035,23 +4992,6 @@ diff -urN --no-dereference binutils-clean/gas/config/tc-xr17032.c binutils-workd
 +      break;
 +
 +    case BFD_RELOC_32:
-+      /* Use pc-relative relocation for FDE initial location.
-+	 The symbol address in .eh_frame may be adjusted in
-+	 _bfd_elf_discard_section_eh_frame, and the content of
-+	 .eh_frame will be adjusted in _bfd_elf_write_section_eh_frame.
-+	 Therefore, we cannot insert a relocation whose addend symbol is
-+	 in .eh_frame.  Othrewise, the value may be adjusted twice.  */
-+      if (fixP->fx_addsy && fixP->fx_subsy
-+	  && (sub_segment = S_GET_SEGMENT (fixP->fx_subsy))
-+	  && strcmp (sub_segment->name, ".eh_frame") == 0
-+	  && S_GET_VALUE (fixP->fx_subsy)
-+	     == fixP->fx_frag->fr_address + fixP->fx_where)
-+	{
-+	  fixP->fx_r_type = BFD_RELOC_32_PCREL;
-+	  fixP->fx_subsy = NULL;
-+	  break;
-+	}
-+      /* Fall through.  */
 +    case BFD_RELOC_16:
 +    case BFD_RELOC_8:
 +    case BFD_RELOC_XR17032_CFA:
@@ -5870,7 +5810,7 @@ diff -urN --no-dereference binutils-clean/gas/config/tc-xr17032.c binutils-workd
 diff -urN --no-dereference binutils-clean/gas/config/tc-xr17032.h binutils-workdir/gas/config/tc-xr17032.h
 --- binutils-clean/gas/config/tc-xr17032.h	1970-01-01 01:00:00.000000000 +0100
 +++ binutils-workdir/gas/config/tc-xr17032.h
-@@ -0,0 +1,113 @@
+@@ -0,0 +1,111 @@
 +/* tc-xr17032.h -- Header file for tc-xr17032.c, the XR/17032 GAS port.
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +
@@ -5929,8 +5869,6 @@ diff -urN --no-dereference binutils-clean/gas/config/tc-xr17032.h binutils-workd
 +#define md_parse_long_option(arg) xr17032_parse_long_option (arg)
 +extern int xr17032_parse_long_option (const char *);
 +
-+#define md_pre_output_hook xr17032_pre_output_hook ()
-+extern void xr17032_pre_output_hook (void);
 +#define GAS_SORT_RELOCS 1
 +
 +#define md_end xr17032_md_end
