@@ -999,7 +999,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032-protos.h gcc-wor
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/gcc/config/xr17032/xr17032.cc
 --- gcc-clean/gcc/config/xr17032/xr17032.cc	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.cc
-@@ -0,0 +1,2361 @@
+@@ -0,0 +1,2355 @@
 +/* Target Code for XR/17032
 +   Copyright (C) 2025-2025 Free Softwa*re Foundation, Inc.
 +   Contributed by monkuous.
@@ -2041,8 +2041,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +  struct xr17032_arg_info info;
 +
 +  if (arg.end_marker_p ())
-+    /* Return the calling convention that used by the current function. */
-+    return gen_int_mode (cum->variant_cc, SImode);
++    return const0_rtx;
 +
 +  return xr17032_get_arg_info (&info, cum, arg.mode, arg.type, arg.named,
 +			       false);
@@ -2068,11 +2067,6 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +xr17032_init_cumulative_args (CUMULATIVE_ARGS *cum, tree fntype, rtx, tree, int)
 +{
 +  memset (cum, 0, sizeof (*cum));
-+
-+  if (fntype)
-+    cum->variant_cc = (xr17032_cc) fntype_abi (fntype).id ();
-+  else
-+    cum->variant_cc = XR17032_CC_BASE;
 +}
 +
 +static rtx
@@ -3364,7 +3358,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gcc/config/xr17032/xr17032.h
 --- gcc-clean/gcc/config/xr17032/xr17032.h	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.h
-@@ -0,0 +1,282 @@
+@@ -0,0 +1,276 @@
 +/* Target Definitions for XR/17032.
 +   Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +   Contributed by monkuous.
@@ -3545,18 +3539,12 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.h gcc-workdir/gc
 +#define STACK_DYNAMIC_OFFSET(FUNDECL) \
 +  (crtl->outgoing_args_size + STACK_POINTER_OFFSET)
 +
++#define STACK_GROWS_DOWNWARD 1
++#define FRAME_GROWS_DOWNWARD 1
++
 +/* Define the standard XR/17032 calling convention and variants.  */
 +
-+enum xr17032_cc
-+{
-+  XR17032_CC_BASE = 0, /* Base standard XR/17032 ABI.  */
-+  XR17032_CC_UNKNOWN
-+};
-+
 +typedef struct {
-+  /* The calling convention that current function used.  */
-+  enum xr17032_cc variant_cc;
-+
 +  /* Number of integer registers used so far, up to MAX_ARGS_IN_REGISTERS. */
 +  unsigned int num_gprs;
 +} CUMULATIVE_ARGS;
