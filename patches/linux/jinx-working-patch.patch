@@ -4291,7 +4291,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/lib/memset.S linux-workdir/a
 diff -urN --no-dereference linux-clean/arch/xr17032/lib/uaccess.S linux-workdir/arch/xr17032/lib/uaccess.S
 --- linux-clean/arch/xr17032/lib/uaccess.S	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/lib/uaccess.S
-@@ -0,0 +1,80 @@
+@@ -0,0 +1,79 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -4327,8 +4327,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/lib/uaccess.S linux-workdir/
 +SYM_FUNC_ALIAS(__asm_copy_from_user, __asm_copy_to_user)
 +
 +SYM_FUNC_START(__clear_user)
-+	lui t2, zero, 0xffff0000
-+	ori t2, t2, 0xffff
++	subi t2, zero, 4
 +
 +	add a3, a0, a1
 +	addi t0, a0, 3
