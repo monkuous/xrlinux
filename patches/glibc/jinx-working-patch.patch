@@ -1648,7 +1648,7 @@ diff -urN --no-dereference glibc-clean/sysdeps/xr17032/dl-link.sym glibc-workdir
 diff -urN --no-dereference glibc-clean/sysdeps/xr17032/dl-machine.h glibc-workdir/sysdeps/xr17032/dl-machine.h
 --- glibc-clean/sysdeps/xr17032/dl-machine.h	1970-01-01 01:00:00.000000000 +0100
 +++ glibc-workdir/sysdeps/xr17032/dl-machine.h
-@@ -0,0 +1,341 @@
+@@ -0,0 +1,342 @@
 +/* Copyright (C) 2025-2025 Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
 +
@@ -1741,6 +1741,7 @@ diff -urN --no-dereference glibc-clean/sysdeps/xr17032/dl-machine.h glibc-workdi
 +	add a0, sp, zero\n\
 +1:	adr lr, %pcrel_hi(_dl_start)\n\
 +	jalr lr, lr, %pcrel_lo(1b)\n\
++	add a0, a3, zero\n\
 +	" _RTLD_PROLOGUE (_dl_start_user) "\
 +	# Stash user entry point in s0.\n\
 +	add s0, a0, zero\n\
@@ -1763,7 +1764,7 @@ diff -urN --no-dereference glibc-clean/sysdeps/xr17032/dl-machine.h glibc-workdi
 +1:	adr a0, %pcrel_hi(_dl_fini)\n\
 +	addi a0, zero, %pcrel_lo(1b)\n\
 +	# Jump to the user entry point.\n\
-+	jalr zero, s0, 9\n\
++	jalr zero, s0, 0\n\
 +	" _RTLD_EPILOGUE (ENTRY_POINT) \
 +	  _RTLD_EPILOGUE (_dl_start_user) "\
 +	.previous" \
