@@ -152,11 +152,10 @@ diff -urN --no-dereference linux-clean/arch/xr17032/configs/xr17032_defconfig li
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/Kbuild linux-workdir/arch/xr17032/include/asm/Kbuild
 --- linux-clean/arch/xr17032/include/asm/Kbuild	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/Kbuild
-@@ -0,0 +1,8 @@
+@@ -0,0 +1,7 @@
 +# SPDX-License-Identifier: GPL-2.0
 +syscall-y += syscall_table_32.h
 +
-+generic-y += string.h
 +generic-y += user.h
 +generic-y += kvm_para.h
 +generic-y += vmlinux.lds.h
