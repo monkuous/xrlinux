@@ -1,0 +1,7 @@
+#! /bin/sh
+
+name=pkg-config
+version=2.5.1
+repology_id=pkgconf
+tarball_url="https://distfiles.ariadne.space/pkgconf/pkgconf-2.5.1.tar.xz"
+tarball_blake2b="0995c1d649876d27e9275a77b702c0c100979c7b83fb7b58c925ca287be5e1568dd7ae2781dac51beb9e84a41d4424428f0542e4de488c45d005d602e76e1277"
