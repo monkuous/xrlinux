@@ -24,6 +24,7 @@ package() {
     cat > "${dest_dir}/xrlinux.cfg" << EOF
 KernelPath: /boot/linux-${version}
 StdoutPath: serial1
+InitrdPath: \$BootVolume
 EOF
 
     post_package_strip

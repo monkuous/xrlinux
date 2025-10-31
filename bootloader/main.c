@@ -113,6 +113,8 @@ static void BiLoadKernel(void) {
         BlMapPage(current, (uintptr_t)buffer);
         current += BL_PAGE_SIZE;
     }
+
+    BlFsFree(file);
 }
 
 struct BiTransitionData {
@@ -130,6 +132,30 @@ static void BiProcessConfig(void) {
     if (BlStdoutPath) {
         auto chosen = BlDtFindOrCreateNode(nullptr, "chosen");
         BlDtAddPropertyString(chosen, "stdout-path", BlStdoutPath);
+    }
+
+    if (BlInitrdPath) {
+        BlPrint("Loading initrd from %s\n", BlInitrdPath);
+
+        void *ptr;
+        size_t size;
+
+        if (BlCompareStrings(BlInitrdPath, "$BootVolume") == 0) {
+            size = BL_MIN(BlRootPartitionSize(), SIZE_MAX);
+            ptr = BlAllocateHeap(size, BL_PAGE_SIZE, true);
+            BlReadFromPartition(ptr, 0, size, true);
+        } else {
+            auto file = BlFsFind(BlInitrdPath);
+            if (!file) BlCrash("initrd does not exist\n", BlInitrdPath);
+            size = BL_MIN(BlFsFileSize(file), SIZE_MAX);
+            ptr = BlAllocateHeap(size, BL_PAGE_SIZE, true);
+            BlFsFileRead(file, ptr, size, 0, true);
+            BlFsFree(file);
+        }
+
+        auto chosen = BlDtFindOrCreateNode(nullptr, "chosen");
+        BlDtAddPropertyU32(chosen, "linux,initrd-start", (uintptr_t)ptr);
+        BlDtAddPropertyU32(chosen, "linux,initrd-end", (uintptr_t)ptr + size);
     }
 }
 

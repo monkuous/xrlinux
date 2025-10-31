@@ -66,7 +66,9 @@ static void BiReadFromDisk(void *buffer, uint64_t position, size_t count, bool b
         if (position & BL_SECTOR_MASK) BlCrash("BiReadFromDisk: unaligned position");
         if (count & BL_SECTOR_MASK) BlCrash("BiReadFromDisk: unaligned size");
 
-        BxReadFromDisk(buffer, position >> BL_SECTOR_SHIFT, count >> BL_SECTOR_SHIFT);
+        if (!BxReadFromDisk(buffer, position >> BL_SECTOR_SHIFT, count >> BL_SECTOR_SHIFT)) {
+            BlCrash("failed to read from disk");
+        }
     } else {
         while (count != 0) {
             uint64_t block = position >> BI_BCACHE_SHIFT;
@@ -145,4 +147,8 @@ void BlReadFromPartition(void *buffer, uint64_t position, size_t count, bool byp
     if (end < position || end > BlRootPartition.Size) BlCrash("tried to read beyond partition bounds");
 
     BiReadFromDisk(buffer, BlRootPartition.Start + position, count, bypassCache);
+}
+
+uint64_t BlRootPartitionSize(void) {
+    return BlRootPartition.Size;
 }
