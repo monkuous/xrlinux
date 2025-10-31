@@ -812,38 +812,38 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/gpr-num.h linux-
 +#define _ASM_XR17032_GPR_NUM_H
 +
 +#define __DEFINE_ASM_GPR_NUMS					\
-+"	.equ	.L__gpr_num_zero,	31\n"			\
-+"	.equ	.L__gpr_num_t0,		0\n"			\
-+"	.equ	.L__gpr_num_t1,		1\n"			\
-+"	.equ	.L__gpr_num_t2,		2\n"			\
-+"	.equ	.L__gpr_num_t3,		3\n"			\
-+"	.equ	.L__gpr_num_t4,		4\n"			\
-+"	.equ	.L__gpr_num_t5,		5\n"			\
-+"	.equ	.L__gpr_num_a0,		6\n"			\
-+"	.equ	.L__gpr_num_a1,		7\n"			\
-+"	.equ	.L__gpr_num_a2,		8\n"			\
-+"	.equ	.L__gpr_num_a3,		9\n"			\
-+"	.equ	.L__gpr_num_s0,		10\n"			\
-+"	.equ	.L__gpr_num_s1,		11\n"			\
-+"	.equ	.L__gpr_num_s2,		12\n"			\
-+"	.equ	.L__gpr_num_s3,		13\n"			\
-+"	.equ	.L__gpr_num_s4,		14\n"			\
-+"	.equ	.L__gpr_num_s5,		15\n"			\
-+"	.equ	.L__gpr_num_s6,		16\n"			\
-+"	.equ	.L__gpr_num_s7,		17\n"			\
-+"	.equ	.L__gpr_num_s8,		18\n"			\
-+"	.equ	.L__gpr_num_s9,		19\n"			\
-+"	.equ	.L__gpr_num_s10,	20\n"			\
-+"	.equ	.L__gpr_num_s11,	21\n"			\
-+"	.equ	.L__gpr_num_s12,	22\n"			\
-+"	.equ	.L__gpr_num_s13,	23\n"			\
-+"	.equ	.L__gpr_num_s14,	24\n"			\
-+"	.equ	.L__gpr_num_s15,	25\n"			\
-+"	.equ	.L__gpr_num_s16,	26\n"			\
-+"	.equ	.L__gpr_num_t17,	27\n"			\
-+"	.equ	.L__gpr_num_tp,		28\n"			\
-+"	.equ	.L__gpr_num_sp,		29\n"			\
-+"	.equ	.L__gpr_num_lr,		30\n"
++"	.equ	.L__gpr_num_zero,	0\n"			\
++"	.equ	.L__gpr_num_t0,		1\n"			\
++"	.equ	.L__gpr_num_t1,		2\n"			\
++"	.equ	.L__gpr_num_t2,		3\n"			\
++"	.equ	.L__gpr_num_t3,		4\n"			\
++"	.equ	.L__gpr_num_t4,		5\n"			\
++"	.equ	.L__gpr_num_t5,		6\n"			\
++"	.equ	.L__gpr_num_a0,		7\n"			\
++"	.equ	.L__gpr_num_a1,		8\n"			\
++"	.equ	.L__gpr_num_a2,		9\n"			\
++"	.equ	.L__gpr_num_a3,		10\n"			\
++"	.equ	.L__gpr_num_s0,		11\n"			\
++"	.equ	.L__gpr_num_s1,		12\n"			\
++"	.equ	.L__gpr_num_s2,		13\n"			\
++"	.equ	.L__gpr_num_s3,		14\n"			\
++"	.equ	.L__gpr_num_s4,		15\n"			\
++"	.equ	.L__gpr_num_s5,		16\n"			\
++"	.equ	.L__gpr_num_s6,		17\n"			\
++"	.equ	.L__gpr_num_s7,		18\n"			\
++"	.equ	.L__gpr_num_s8,		19\n"			\
++"	.equ	.L__gpr_num_s9,		20\n"			\
++"	.equ	.L__gpr_num_s10,	21\n"			\
++"	.equ	.L__gpr_num_s11,	22\n"			\
++"	.equ	.L__gpr_num_s12,	23\n"			\
++"	.equ	.L__gpr_num_s13,	24\n"			\
++"	.equ	.L__gpr_num_s14,	25\n"			\
++"	.equ	.L__gpr_num_s15,	26\n"			\
++"	.equ	.L__gpr_num_s16,	27\n"			\
++"	.equ	.L__gpr_num_t17,	28\n"			\
++"	.equ	.L__gpr_num_tp,		29\n"			\
++"	.equ	.L__gpr_num_sp,		30\n"			\
++"	.equ	.L__gpr_num_lr,		31\n"
 +
 +#endif /* _ASM_XR17032_GPR_NUM_H */
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/irq.h linux-workdir/arch/xr17032/include/asm/irq.h
@@ -1473,6 +1473,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/ptrace.h linux-w
 +#include <uapi/asm/ptrace.h>
 +
 +struct pt_regs {
++	unsigned long pc;
 +	unsigned long t0;
 +	unsigned long t1;
 +	unsigned long t2;
@@ -1504,7 +1505,6 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/ptrace.h linux-w
 +	unsigned long tp;
 +	unsigned long sp;
 +	unsigned long lr;
-+	unsigned long pc;
 +	unsigned long rs;
 +	unsigned long orig_a3;
 +};
@@ -2201,6 +2201,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/uapi/asm/ptrace.h li
 +
 +/* must be a prefix of struct pt_regs */
 +struct user_regs_struct {
++	unsigned long pc;
 +	unsigned long t0;
 +	unsigned long t1;
 +	unsigned long t2;
@@ -2232,7 +2233,6 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/uapi/asm/ptrace.h li
 +	unsigned long tp;
 +	unsigned long sp;
 +	unsigned long lr;
-+	unsigned long pc;
 +};
 +
 +#endif /* _UAPI_ASM_XR17032_PTRACE_H */

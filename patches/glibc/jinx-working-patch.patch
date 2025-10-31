@@ -409,6 +409,40 @@ diff -urN --no-dereference glibc-clean/sysdeps/unix/sysv/linux/xr17032/bits/proc
 +typedef unsigned long int elf_greg_t;
 +typedef unsigned long int elf_gregset_t[32];
 +typedef unsigned int elf_fpregset_t;
+diff -urN --no-dereference glibc-clean/sysdeps/unix/sysv/linux/xr17032/bits/sigcontext.h glibc-workdir/sysdeps/unix/sysv/linux/xr17032/bits/sigcontext.h
+--- glibc-clean/sysdeps/unix/sysv/linux/xr17032/bits/sigcontext.h	1970-01-01 01:00:00.000000000 +0100
++++ glibc-workdir/sysdeps/unix/sysv/linux/xr17032/bits/sigcontext.h
+@@ -0,0 +1,30 @@
++/* Copyright (C) 2025-2025 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#ifndef _BITS_SIGCONTEXT_H
++#define _BITS_SIGCONTEXT_H 1
++
++#if !defined _SIGNAL_H && !defined _SYS_UCONTEXT_H
++# error "Never use <bits/sigcontext.h> directly; include <signal.h> instead."
++#endif
++
++struct sigcontext {
++	/* gregs[0] holds the program counter.  */
++	unsigned long int gregs[32];
++};
++
++#endif
 diff -urN --no-dereference glibc-clean/sysdeps/unix/sysv/linux/xr17032/clone.S glibc-workdir/sysdeps/unix/sysv/linux/xr17032/clone.S
 --- glibc-clean/sysdeps/unix/sysv/linux/xr17032/clone.S	1970-01-01 01:00:00.000000000 +0100
 +++ glibc-workdir/sysdeps/unix/sysv/linux/xr17032/clone.S
@@ -630,15 +664,15 @@ diff -urN --no-dereference glibc-clean/sysdeps/unix/sysv/linux/xr17032/sys/ucont
 +#ifdef __USE_MISC
 +# define NGREG	32
 +
-+# define REG_A0 6
++# define REG_PC 0
++# define REG_A0 7
 +# define REG_NARGS 4
-+# define REG_S0 10
-+# define REG_S1 11
-+# define REG_S2 12
-+# define REG_TP 28
-+# define REG_SP 29
-+# define REG_LR 30
-+# define REG_PC 31
++# define REG_S0 11
++# define REG_S1 12
++# define REG_S2 13
++# define REG_TP 29
++# define REG_SP 30
++# define REG_LR 31
 +
 +typedef unsigned long int greg_t;
 +
