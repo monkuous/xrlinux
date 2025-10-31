@@ -452,7 +452,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/sync.md gcc-workdir/gcc/
 +	   "ll\t%2,%A0\;"
 +	   "<insn>\t%2,%2,%z1\;"
 +	   "sc\t%2,%A0,%2\;"
-+	   "bne\t%2,1b";
++	   "beq\t%2,1b";
 +  }
 +  [(set (attr "length") (const_int 16))])
 +
@@ -488,7 +488,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/sync.md gcc-workdir/gcc/
 +	   "ll\t%0,%A1\;"
 +	   "<insn>\t%3,%0,%z2\;"
 +	   "sc\t%3,%A1,%3\;"
-+	   "bne\t%3,1b";
++	   "beq\t%3,1b";
 +  }
 +  [(set (attr "length") (const_int 16))])
 +
@@ -513,7 +513,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/sync.md gcc-workdir/gcc/
 +	   "and%i4\t%6,%0,%4\;"
 +	   "or\t%6,%6,%5\;"
 +	   "sc\t%5,%A1,%6\;"
-+	   "bne\t%5,1b";
++	   "beq\t%5,1b";
 +  }
 +  [(set (attr "length") (const_int 28))])
 +
@@ -577,7 +577,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/sync.md gcc-workdir/gcc/
 +	   "and%i4\t%5,%0,%4\;"
 +	   "or\t%6,%6,%5\;"
 +	   "sc\t%5,%A1,%6\;"
-+	   "bne\t%5,1b";
++	   "beq\t%5,1b";
 +  }
 +  [(set (attr "length") (const_int 32))])
 +
@@ -648,7 +648,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/sync.md gcc-workdir/gcc/
 +    return "1:\;"
 +	   "ll\t%3,%A1\;"
 +	   "sc\t%0,%A1,%0\;"
-+	   "bne\t%0,1b\;"
++	   "beq\t%0,1b\;"
 +	   "add\t%0,%3,zero";
 +  }
 +  [(set (attr "length") (const_int 16))])
@@ -702,7 +702,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/sync.md gcc-workdir/gcc/
 +	   "and\t%4,%0,%z3\;"
 +	   "or\t%4,%4,%z2\;"
 +	   "sc\t%4,%A1,%4\;"
-+	   "bne\t%4,1b";
++	   "beq\t%4,1b";
 +  }
 +  [(set (attr "length") (const_int 20))])
 +
@@ -739,7 +739,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/sync.md gcc-workdir/gcc/
 +	   "sub\t%4,%0,%z2\;"
 +	   "bne\t%4,1f\;"
 +	   "sc\t%4,%A1,%z3\;"
-+	   "bne\t%4,1b\;"
++	   "beq\t%4,1b\;"
 +	   "1:";
 +  }
 +  [(set (attr "length") (const_int 20))])
@@ -892,7 +892,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/sync.md gcc-workdir/gcc/
 +	   "and%i5\t%6,%0,%5\;"
 +	   "or\t%6,%6,%z3\;"
 +	   "sc\t%6,%A1,%6\;"
-+	   "bne\t%6,1b\;"
++	   "beq\t%6,1b\;"
 +	   "1:";
 +  }
 +  [(set (attr "length") (const_int 32))])
