@@ -1762,7 +1762,7 @@ diff -urN --no-dereference glibc-clean/sysdeps/xr17032/dl-machine.h glibc-workdi
 +	add sp, s1, zero\n\
 +	# Pass our finalizer function to _start.\n\
 +1:	adr a0, %pcrel_hi(_dl_fini)\n\
-+	addi a0, zero, %pcrel_lo(1b)\n\
++	addi a0, a0, %pcrel_lo(1b)\n\
 +	# Jump to the user entry point.\n\
 +	jalr zero, s0, 0\n\
 +	" _RTLD_EPILOGUE (ENTRY_POINT) \
