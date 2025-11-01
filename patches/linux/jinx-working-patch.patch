@@ -1851,7 +1851,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/tlb.h linux-work
 diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/tlbflush.h linux-workdir/arch/xr17032/include/asm/tlbflush.h
 --- linux-clean/arch/xr17032/include/asm/tlbflush.h	1970-01-01 01:00:00.000000000 +0100
 +++ linux-workdir/arch/xr17032/include/asm/tlbflush.h
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,41 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
 + * Copyright (C) 2025 monkuous
@@ -1879,15 +1879,17 @@ diff -urN --no-dereference linux-clean/arch/xr17032/include/asm/tlbflush.h linux
 +
 +static inline void local_flush_tlb_page(unsigned long addr)
 +{
-+	addr &= PAGE_MASK;
-+	asm volatile("mtcr itbctrl, %0" :: "r" (addr) : "memory");
-+	asm volatile("mtcr dtbctrl, %0" :: "r" (addr) : "memory");
-+	asm volatile(
-+		"mtcr dtbctrl, %0"
-+		:
-+		: "r" (_PGTABLE_ADDR | (addr >> 10))
-+		: "memory"
-+	);
++	/* TODO: Fix heisenbugs that appear when this only flushes the specified page */
++	/*addr &= PAGE_MASK;
++	 *	asm volatile("mtcr itbctrl, %0" :: "r" (addr) : "memory");
++	 *	asm volatile("mtcr dtbctrl, %0" :: "r" (addr) : "memory");
++	 *	asm volatile(
++	 *		"mtcr dtbctrl, %0"
++	 *		:
++	 *		: "r" (_PGTABLE_ADDR | (addr >> 10))
++	 *		: "memory"
++	 *	);*/
++	local_flush_tlb_all();
 +}
 +
 +#endif /* _ASM_XR17032_TLBFLUSH_H */
@@ -2950,7 +2952,7 @@ diff -urN --no-dereference linux-clean/arch/xr17032/kernel/head.S linux-workdir/
 +	mtcr scratch3, a0
 +
 +	# invalidate non-global tb entries
-+	addi t0, zero, 2
++	addi t0, zero, 1 # TODO: Fix heisenbugs that appear when this doesn't include global entries
 +	mtcr itbctrl, t0
 +	mtcr dtbctrl, t0
 +
