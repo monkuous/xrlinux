@@ -4,56 +4,35 @@ name=init
 version=0
 revision=1
 skip_pkg_check=yes
-hostdeps="gcc-bootstrap"
+hostdeps="gcc"
 imagedeps="build-essential"
+deps="glibc"
 
 build() {
-    "${TRIPLE}-gcc" -ffreestanding -fno-pic -static -nostdlib -o init -x c -O3 - << EOF
-#include <stddef.h>
+    "${TRIPLE}-gcc" -o init -x c -O3 - << EOF
+#include <stdio.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
 
-#define __NR_read 63
-#define __NR_write 64
-
-#define STDIN_FILENO 0
-#define STDOUT_FILENO 1
-
-typedef long ssize_t;
-
-static ssize_t read(int fd, void *buf, size_t count) {
-    register unsigned long sys_nr asm("t5") = __NR_read;
-    register ssize_t ret asm("a3");
-    register int fd_arg asm("a0") = fd;
-    register void *buf_arg asm("a1") = buf;
-    register size_t count_arg asm("a2") = count;
-    asm volatile("sys" : "=r" (ret) : "r" (sys_nr), "r" (fd_arg), "r" (buf_arg), "r" (count_arg) : "memory");
-    return ret;
-}
-
-static ssize_t write(int fd, const void *buf, size_t count) {
-    register unsigned long sys_nr asm("t5") = __NR_write;
-    register ssize_t ret asm("a3");
-    register int fd_arg asm("a0") = fd;
-    register const void *buf_arg asm("a1") = buf;
-    register size_t count_arg asm("a2") = count;
-    asm volatile("sys" : "=r" (ret) : "r" (sys_nr), "r" (fd_arg), "r" (buf_arg), "r" (count_arg) : "memory");
-    return ret;
-}
-
-void _start(void) {
-    static const char message1[] = "Hello from userspace!\n";
-    static const char message2[] = "Got data: ";
-    char buffer[256];
-
-    write(STDOUT_FILENO, message1, sizeof(message1) - 1);
-
-    ssize_t count = read(STDIN_FILENO, buffer, sizeof(buffer));
-
-    if (count >= 0) {
-        write(STDOUT_FILENO, message2, sizeof(message2) - 1);
-        write(STDOUT_FILENO, buffer, count);
+int main(int argc, char *argv[]) {
+    if (getpid() != 1) {
+        fprintf(stderr, "%s: PID must be 1\n", argv[0]);
+        return 1;
     }
 
-    __builtin_trap();
+    if (setsid() == -1) {
+        fprintf(stderr, "%s: setsid failed: %m\n", argv[0]);
+        return 1;
+    }
+
+    if (ioctl(STDIN_FILENO, TIOCSCTTY, 0) == -1) {
+        fprintf(stderr, "%s: failed to set controlling terminal: %m\n", argv[0]);
+        return 1;
+    }
+
+    execl("/usr/bin/bash", "/usr/bin/bash", NULL);
+    fprintf(stderr, "%s: failed to start bash: %m\n", argv[0]);
+    return 1;
 }
 EOF
 }

@@ -4,4 +4,4 @@ name=base
 version=0
 revision=1
 skip_pkg_check=yes
-deps="base-files bash core-libs linux"
+deps="base-files bash core-libs coreutils init linux"

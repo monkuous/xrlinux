@@ -21,8 +21,13 @@ post_package_strip() {
 }
 
 autotools_regen() {
+    ACLOCAL_INCLUDE=""
+    if [ -d "${sysroot_dir}/usr/share/aclocal" ]; then
+        ACLOCAL_INCLUDE="-I${sysroot_dir}/usr/share/aclocal"
+    fi
+
     find . '(' -name configure.ac -o -name configure.in ')' -type f -print0 \
-            | sort -z | xargs -0 autoreconf -fvi "$@"
+            | sort -z | xargs -0 autoreconf -fvi "$@" $ACLOCAL_INCLUDE
 }
 
 autotools_configure() {

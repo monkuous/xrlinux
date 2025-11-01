@@ -1,0 +1,30 @@
+#! /bin/sh
+
+name=coreutils
+version=9.8
+revision=1
+tarball_url="https://ftpmirror.gnu.org/gnu/coreutils/coreutils-${version}.tar.xz"
+tarball_blake2b="a93e26c8dda875b11541808d82ff8d6537f521b9c44e2a9959ee8f452823a4df5aed2793ac32766e2d3f832606d7190f7f53ea5870419f585aa66429a9626d98"
+source_hostdeps="autoconf"
+imagedeps="build-essential"
+hostdeps="gcc"
+deps="core-libs"
+
+prepare() {
+    cp /usr/local/share/autoconf/build-aux/config.sub build-aux
+}
+
+configure() {
+    autotools_configure \
+        --enable-no-install-program=kill,uptime
+}
+
+build() {
+    make -j"${parallelism}"
+}
+
+package() {
+    make -j"${parallelism}" DESTDIR="${dest_dir}" install
+
+    post_package_strip
+}
