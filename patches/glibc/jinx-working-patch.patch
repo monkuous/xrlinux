@@ -2078,7 +2078,7 @@ diff -urN --no-dereference glibc-clean/sysdeps/xr17032/dl-trampoline.S glibc-wor
 +
 +ENTRY (_dl_runtime_resolve)
 +  # Save arguments to stack.
-+  addi sp, sp, FRAME_SIZE
++  subi sp, sp, FRAME_SIZE
 +  mov long [sp + 0x00], lr
 +  mov long [sp + 0x04], a0
 +  mov long [sp + 0x08], a1
