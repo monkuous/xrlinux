@@ -2707,7 +2707,7 @@ diff -urN --no-dereference glibc-clean/sysdeps/xr17032/sotruss-lib.c glibc-workd
 diff -urN --no-dereference glibc-clean/sysdeps/xr17032/start.S glibc-workdir/sysdeps/xr17032/start.S
 --- glibc-clean/sysdeps/xr17032/start.S	1970-01-01 01:00:00.000000000 +0100
 +++ glibc-workdir/sysdeps/xr17032/start.S
-@@ -0,0 +1,87 @@
+@@ -0,0 +1,88 @@
 +/* Startup code compliant to the ELF XR/17032 ABI.
 +   Copyright (C) 1995-2025 Free Software Foundation, Inc.
 +   This file is part of the GNU C Library.
@@ -2757,6 +2757,7 @@ diff -urN --no-dereference glibc-clean/sysdeps/xr17032/start.S glibc-workdir/sys
 +	   .cfi_label to force starting the FDE.  */
 +	.cfi_label .Ldummy
 +	cfi_undefined (lr)
++	subi  sp, sp, 12
 +	mov   long [sp + 4], a0 /* rtld_fini. */
 +	/* main may be in a shared library.  */
 +#if defined PIC && !defined SHARED
@@ -2768,11 +2769,11 @@ diff -urN --no-dereference glibc-clean/sysdeps/xr17032/start.S glibc-workdir/sys
 +1:	adr   a0, %got_pcrel_hi(main)
 +	mov   a0, long [a0 + %pcrel_lo(1b)]
 +#endif
-+	mov   a1, long [sp]     /* argc.  */
-+	addi  a2, sp, 4         /* argv.  */
-+	addi  a3, zero, 0       /* Used to be init.  */
-+	mov   long [sp], zero   /* Used to be fini.  */
-+	mov   long [sp + 8], sp /* stack_end. */
++	mov   a1, long [sp + 12] /* argc.  */
++	addi  a2, sp, 16         /* argv.  */
++	addi  a3, zero, 0        /* Used to be init.  */
++	mov   long [sp], zero    /* Used to be fini.  */
++	mov   long [sp + 8], sp  /* stack_end. */
 +
 +#if defined PIC && !defined SHARED
 +1:	adr   t1, %pcrel_hi(__libc_start_main)
