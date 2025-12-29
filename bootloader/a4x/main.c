@@ -6,6 +6,8 @@
 #include "memory.h"
 #include "platform.h"
 
+#include <config.h>
+
 #define BX_RAM_BANK_INTERVAL 0x200'0000 // RAM banks are placed at 32M intervals
 
 #define BX_CPU_IRQ_INT 1
@@ -86,11 +88,6 @@ static void BxDtAddMemory(void) {
     }
 
     if (start != end) BxDtAddMemoryBank(start, end);
-}
-
-static void BxDtAddChosen(char *args) {
-    auto node = BlDtCreateNode(nullptr, "chosen");
-    BlDtAddPropertyString(node, "bootargs", args);
 }
 
 static uint32_t BxCpuPhandles[BL_ARRAY_SIZE(((struct FwDeviceDatabase *)0)->Processors)];
@@ -247,7 +244,7 @@ static void BxDtCreateSocNode(void) {
     BlDtAddProperty(BxSocNode, "ranges", nullptr, 0);
 }
 
-static void BxDtPopulate(char *args) {
+static void BxDtPopulate() {
     BlPrint("Populating device tree\n");
 
     BlDtAddPropertyU32(nullptr, "#address-cells", 1);
@@ -262,7 +259,6 @@ static void BxDtPopulate(char *args) {
     }
 
     BxAliasesNode = BlDtCreateNode(nullptr, "aliases");
-    BxDtAddChosen(args);
 
     BxDtAddMemory();
     BxDtAddCpus();
@@ -280,17 +276,18 @@ BL_USED _Noreturn void BxMain(
     struct FwDeviceDatabase *deviceDatabase,
     struct FwApiTable *apiTable,
     struct FwPartition *bootPartition,
-    char *args
+    const char *args
 ) {
     BxDeviceDatabase = deviceDatabase;
     BxApiTable = apiTable;
+    BlCommandLine = args;
 
     struct FwDisk *disk = &deviceDatabase->Disks[bootPartition->Id];
     BxBootDisk = &disk->Partitions[BL_ARRAY_SIZE(disk->Partitions) - 1];
     BL_ASSERT(BxBootDisk->BaseSector == 0);
 
     BxAddMemoryRanges();
-    BxDtPopulate(args);
+    BxDtPopulate();
 
     BlMain();
 }

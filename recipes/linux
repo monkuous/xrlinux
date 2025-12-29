@@ -20,12 +20,7 @@ build() {
 
 package() {
     mkdir -p "${dest_dir}/boot"
-    cp -p arch/xr17032/boot/Image "${dest_dir}/boot/linux-${version}"
-    cat > "${dest_dir}/xrlinux.cfg" << EOF
-KernelPath: /boot/linux-${version}
-StdoutPath: serial1
-InitrdPath: \$BootVolume
-EOF
+    cp -p arch/xr17032/boot/Image "${dest_dir}/boot/linux"
 
     post_package_strip
 }

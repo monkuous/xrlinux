@@ -157,6 +157,11 @@ static void BiProcessConfig(void) {
         BlDtAddPropertyU32(chosen, "linux,initrd-start", (uintptr_t)ptr);
         BlDtAddPropertyU32(chosen, "linux,initrd-end", (uintptr_t)ptr + size);
     }
+
+    if (BlCommandLine) {
+        auto chosen = BlDtFindOrCreateNode(nullptr, "chosen");
+        BlDtAddPropertyString(chosen, "bootargs", BlCommandLine);
+    }
 }
 
 _Noreturn void BlMain(void) {
