@@ -999,7 +999,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032-protos.h gcc-wor
 diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/gcc/config/xr17032/xr17032.cc
 --- gcc-clean/gcc/config/xr17032/xr17032.cc	1970-01-01 01:00:00.000000000 +0100
 +++ gcc-workdir/gcc/config/xr17032/xr17032.cc
-@@ -0,0 +1,2355 @@
+@@ -0,0 +1,2359 @@
 +/* Target Code for XR/17032
 +   Copyright (C) 2025-2025 Free Softwa*re Foundation, Inc.
 +   Contributed by monkuous.
@@ -1427,6 +1427,10 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +     is accessible.  */
 +  if (GET_MODE_SIZE (mode) > UNITS_PER_WORD
 +      && !SMALL_OPERAND (INTVAL (x) + GET_MODE_SIZE (mode) - UNITS_PER_WORD))
++    return false;
++
++  /* Check that X is suitably aligned.  */
++  if (INTVAL (x) & (GET_MODE_SIZE (mode) - 1))
 +    return false;
 +
 +  return true;
@@ -2639,7 +2643,7 @@ diff -urN --no-dereference gcc-clean/gcc/config/xr17032/xr17032.cc gcc-workdir/g
 +
 +  fprintf (file, "%s ", xr17032_mode_id (mode));
 +
-+  if (xr17032_classify_address (&addr, x, word_mode, true))
++  if (xr17032_classify_address (&addr, x, mode, true))
 +    switch (addr.type)
 +      {
 +      case ADDRESS_REG:
